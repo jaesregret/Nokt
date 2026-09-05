@@ -17,6 +17,5 @@ public class Token
         Value = value;
         Line = line;
     }
-=
     public override string ToString() => $"{Type}('{Value}') Line {Line}";
 }
