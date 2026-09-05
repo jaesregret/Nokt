@@ -22,8 +22,7 @@ public class Interpreter
                 break;
 
             default:
-                throw new NoktException("Unknown Statement type");
+                throw new NoktException("Unknown statement type");
         }
     }
 }
-C#
