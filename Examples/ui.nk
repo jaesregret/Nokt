@@ -1,0 +1,11 @@
+window "Hello Nokt" {
+    size 800 500
+
+    text "Hello World!"
+
+    input "Type something"
+
+    button "Click me" {
+        say "Button clicked!"
+    }
+}

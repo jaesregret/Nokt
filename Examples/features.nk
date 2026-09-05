@@ -1,0 +1,31 @@
+
+let total = 2 + 3 * 4
+say total
+say (2 + 3) * 4
+
+let name = "Jae"
+say "Hello " + name
+say true and not false
+say false or true
+say 3 == 3
+say 3 != 4
+say 2 < 3
+say 3 <= 3
+say 3 >= 3
+
+let value = 11
+if value > 10
+    say "maior"
+else
+    say "menor"
+
+let small = 2
+if small > 10
+    say "unexpected"
+else
+    say "menor"
+
+let counter = 7
+while counter < 10
+    counter = counter + 1
+say counter

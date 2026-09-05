@@ -8,6 +8,9 @@ public class Lexer
     private readonly string _source;
     private int _position;
     private int _line = 1;
+    private int _column = 1;
+    private bool _atLineStart = true;
+    private readonly List<int> _indentation = new() { 0 };
 
     public Lexer(string source)
     {
@@ -21,13 +24,35 @@ public class Lexer
 
         while (!IsAtEnd())
         {
-            SkipWhitespace();
+            if (_atLineStart)
+            {
+                ReadIndentation(tokens);
+                if (IsAtEnd()) break;
+            }
 
-            if (IsAtEnd()) break;
+            if (Peek() == ' ' || Peek() == '\t' || Peek() == '\r')
+            {
+                SkipWhitespace();
+                continue;
+            }
 
             char c = Peek();
 
-            if (c == '"')
+            if (c == '\n')
+            {
+                int line = _line;
+                int column = _column;
+                Advance();
+                tokens.Add(new Token(TokenType.NewLine, "\\n", line, column));
+                _line++;
+                _column = 1;
+                _atLineStart = true;
+            }
+            else if (c == '#')
+            {
+                while (!IsAtEnd() && Peek() != '\n') Advance();
+            }
+            else if (c == '"')
             {
                 tokens.Add(ReadString());
             }
@@ -41,41 +66,139 @@ public class Lexer
             }
             else if (c == '=')
             {
+                int line = _line;
+                int column = _column;
                 Advance();
-                tokens.Add(new Token(TokenType.Equals, "=", _line));
+                if (MatchCharacter('='))
+                    tokens.Add(new Token(TokenType.EqualEqual, "==", line, column));
+                else
+                    tokens.Add(new Token(TokenType.Equals, "=", line, column));
+            }
+            else if (c == '!')
+            {
+                int line = _line;
+                int column = _column;
+                Advance();
+                if (!MatchCharacter('='))
+                    throw Error("expected '=' after '!'", line, column, "!");
+                tokens.Add(new Token(TokenType.NotEqual, "!=", line, column));
+            }
+            else if (c == '>')
+            {
+                tokens.Add(ReadComparison(TokenType.Greater, TokenType.GreaterEqual));
+            }
+            else if (c == '<')
+            {
+                tokens.Add(ReadComparison(TokenType.Less, TokenType.LessEqual));
+            }
+            else if (c == '+')
+            {
+                tokens.Add(ReadSingle(TokenType.Plus));
+            }
+            else if (c == '-')
+            {
+                tokens.Add(ReadSingle(TokenType.Minus));
+            }
+            else if (c == '*')
+            {
+                tokens.Add(ReadSingle(TokenType.Star));
+            }
+            else if (c == '/')
+            {
+                tokens.Add(ReadSingle(TokenType.Slash));
+            }
+            else if (c == '(')
+            {
+                tokens.Add(ReadSingle(TokenType.LeftParen));
+            }
+            else if (c == ')')
+            {
+                tokens.Add(ReadSingle(TokenType.RightParen));
+            }
+            else if (c == '{')
+            {
+                tokens.Add(ReadSingle(TokenType.LeftBrace));
+            }
+            else if (c == '}')
+            {
+                tokens.Add(ReadSingle(TokenType.RightBrace));
             }
             else
             {
-                throw new NoktException($"Invalid character '{c}' at line {_line}");
+                throw Error($"invalid character '{c}'", _line, _column, c.ToString());
             }
         }
 
-        tokens.Add(new Token(TokenType.EndOfFile, "", _line));
+        while (_indentation.Count > 1)
+        {
+            _indentation.RemoveAt(_indentation.Count - 1);
+            tokens.Add(new Token(TokenType.Dedent, "", _line, _column));
+        }
+
+        tokens.Add(new Token(TokenType.EndOfFile, "", _line, _column));
         return tokens;
+    }
+
+    private void ReadIndentation(List<Token> tokens)
+    {
+        int startColumn = _column;
+        int spaces = 0;
+
+        while (!IsAtEnd() && (Peek() == ' ' || Peek() == '\t'))
+        {
+            spaces += Peek() == '\t' ? 4 : 1;
+            Advance();
+        }
+
+        if (IsAtEnd() || Peek() == '\n' || Peek() == '#')
+            return;
+
+        _atLineStart = false;
+        int currentIndentation = _indentation[^1];
+        if (spaces > currentIndentation)
+        {
+            _indentation.Add(spaces);
+            tokens.Add(new Token(TokenType.Indent, "", _line, startColumn));
+        }
+        else if (spaces < currentIndentation)
+        {
+            while (_indentation.Count > 1 && spaces < _indentation[^1])
+            {
+                _indentation.RemoveAt(_indentation.Count - 1);
+                tokens.Add(new Token(TokenType.Dedent, "", _line, startColumn));
+            }
+
+            if (spaces != _indentation[^1])
+                throw Error("inconsistent indentation", _line, startColumn, spaces.ToString());
+        }
     }
 
     private Token ReadString()
     {
+        int line = _line;
+        int column = _column;
         Advance();
         var sb = new StringBuilder();
 
         while (!IsAtEnd() && Peek() != '"')
         {
             if (Peek() == '\n')
-                throw new NoktException($"Unterminated string at line {_line}");
+                throw Error("unterminated string", line, column, "\"");
 
             sb.Append(Advance());
         }
 
         if (IsAtEnd())
-            throw new NoktException($"Unterminated string at line {_line}");
+            throw Error("unterminated string", line, column, "\"");
 
         Advance();
-        return new Token(TokenType.String, sb.ToString(), _line);
+        return new Token(TokenType.String, sb.ToString(), line, column);
     }
 
     private Token ReadIdentifier()
     {
+        int line = _line;
+        int column = _column;
         var sb = new StringBuilder();
 
         while (!IsAtEnd() && (IsLetter(Peek()) || IsDigit(Peek())))
@@ -85,17 +208,32 @@ public class Lexer
 
         string text = sb.ToString();
 
-        if (text == "say")
-            return new Token(TokenType.Say, text, _line);
+        var keywords = new Dictionary<string, TokenType>
+        {
+            ["say"] = TokenType.Say,
+            ["let"] = TokenType.Let,
+            ["if"] = TokenType.If,
+            ["else"] = TokenType.Else,
+            ["while"] = TokenType.While,
+            ["true"] = TokenType.True,
+            ["false"] = TokenType.False,
+            ["and"] = TokenType.And,
+            ["or"] = TokenType.Or,
+            ["not"] = TokenType.Not,
+            ["window"] = TokenType.Window,
+            ["text"] = TokenType.Text,
+            ["button"] = TokenType.Button,
+            ["input"] = TokenType.Input,
+            ["size"] = TokenType.Size
+        };
 
-        if (text == "let")
-            return new Token(TokenType.Let, text, _line);
-
-        return new Token(TokenType.Identifier, text, _line);
+        return new Token(keywords.GetValueOrDefault(text, TokenType.Identifier), text, line, column);
     }
 
     private Token ReadNumber()
     {
+        int line = _line;
+        int column = _column;
         var sb = new StringBuilder();
 
         while (!IsAtEnd() && IsDigit(Peek()))
@@ -103,7 +241,7 @@ public class Lexer
             sb.Append(Advance());
         }
 
-        return new Token(TokenType.Number, sb.ToString(), _line);
+        return new Token(TokenType.Number, sb.ToString(), line, column);
     }
 
     private void SkipWhitespace()
@@ -116,11 +254,6 @@ public class Lexer
             {
                 Advance();
             }
-            else if (c == '\n')
-            {
-                _line++;
-                Advance();
-            }
             else
             {
                 break;
@@ -128,8 +261,41 @@ public class Lexer
         }
     }
 
+    private Token ReadSingle(TokenType type)
+    {
+        int line = _line;
+        int column = _column;
+        string value = Advance().ToString();
+        return new Token(type, value, line, column);
+    }
+
+    private Token ReadComparison(TokenType single, TokenType combined)
+    {
+        int line = _line;
+        int column = _column;
+        string value = Advance().ToString();
+        if (MatchCharacter('=')) value += "=";
+        return new Token(value == ">=" || value == "<=" ? combined : single, value, line, column);
+    }
+
+    private bool MatchCharacter(char expected)
+    {
+        if (IsAtEnd() || Peek() != expected) return false;
+        Advance();
+        return true;
+    }
+
+    private NoktException Error(string message, int line, int column, string value) =>
+        new($"{message} at line {line}, column {column}; token/value '{value}'");
+
     private char Peek() => _source[_position];
-    private char Advance() => _source[_position++];
+
+    private char Advance()
+    {
+        char value = _source[_position++];
+        _column++;
+        return value;
+    }
     private bool IsAtEnd() => _position >= _source.Length;
 
     private static bool IsLetter(char c) =>
