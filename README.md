@@ -1,33 +1,29 @@
 # Nokt
+**Nokt** is a programming language built entirely from scratch using .NET 8.
 
-Small programming language built from scratch with .NET 8.
+## What it can do
+* **Display messages:** Uses the `say` command to print output.
+* **Store values:** Uses `let` to declare variables and `=` to update them.
+* **Support multiple data types:** Handles text (strings), numbers (integers), booleans (`true`/`false`), and variable references.
+* **Perform math and combine text:** Standard arithmetic (`+`, `-`, `*`, `/`) with parentheses support, plus string concatenation.
+* **Compare and evaluate logic:** Checks equalities and inequalities (`==`, `>`, `<`, etc.) and uses logical operators (`and`, `or`, `not`).
+* **Control code flow:** Makes decisions using `if`/`else` statements and repeats actions with `while` loops.
+* **Add comments:** Allows code annotations starting with `#`.
+* **Report detailed errors:** Points out exact lines, columns, and values when lexical, syntax, or runtime errors occur.
+* **Create desktop windows (GUI):** Features basic Windows Forms support to build windows containing text inputs, buttons, and click event blocks.
 
-## Funcionalidades
-
-- `say` para imprimir expressões.
-- `let` para declarar ou atualizar variáveis.
-- Atribuição de variáveis existentes, como `x = 20`.
-- Strings, inteiros, booleanos (`true` e `false`) e referências a variáveis.
-- Operadores aritméticos `+`, `-`, `*` e `/`, com precedência e parênteses.
-- Concatenação de strings usando `+`.
-- Comparações `==`, `!=`, `>`, `<`, `>=` e `<=`.
-- Operadores lógicos `and`, `or` e `not`.
-- Controle de fluxo com `if`, `else` e `while`, usando indentação de quatro espaços.
-- Comentários iniciados por `#`.
-- Erros de léxico, sintaxe e execução com linha, coluna e token/valor quando disponíveis.
-- xUI inicial para janelas Windows Forms com `window`, `size`, `text`, `input` e `button`.
-- Blocos de botão executados quando o usuário clica no botão.
-
-## Uso
+## How to use
+To run a feature showcase example:
 
 ```text
 dotnet run --project src/nk/Nokt.csproj -- Examples/features.nk
-```
 
-Para executar o exemplo gráfico no Windows:
+```
+To run the graphical interface example (Windows only):
 
 ```text
 dotnet run --project src/nk/Nokt.csproj -- Examples/ui.nk
+
 ```
 
-Exemplos legados: `Examples/hello.nk` e `Examples/vars.nk`.
+Legacy examples are also available at `Examples/hello.nk` and `Examples/vars.nk`.
