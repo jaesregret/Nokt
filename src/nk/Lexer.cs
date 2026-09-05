@@ -35,6 +35,15 @@ public class Lexer
             {
                 tokens.Add(ReadIdentifier());
             }
+            else if (IsDigit(c))
+            {
+                tokens.Add(ReadNumber());
+            }
+            else if (c == '=')
+            {
+                Advance();
+                tokens.Add(new Token(TokenType.Equals, "=", _line));
+            }
             else
             {
                 throw new NoktException($"Invalid character '{c}' at line {_line}");
@@ -79,7 +88,22 @@ public class Lexer
         if (text == "say")
             return new Token(TokenType.Say, text, _line);
 
-        throw new NoktException($"Unknown command '{text}' at line {_line}");
+        if (text == "let")
+            return new Token(TokenType.Let, text, _line);
+
+        return new Token(TokenType.Identifier, text, _line);
+    }
+
+    private Token ReadNumber()
+    {
+        var sb = new StringBuilder();
+
+        while (!IsAtEnd() && IsDigit(Peek()))
+        {
+            sb.Append(Advance());
+        }
+
+        return new Token(TokenType.Number, sb.ToString(), _line);
     }
 
     private void SkipWhitespace()
