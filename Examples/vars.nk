@@ -1,0 +1,5 @@
+let name = "jae"
+let age = "18"
+
+say name
+say age
