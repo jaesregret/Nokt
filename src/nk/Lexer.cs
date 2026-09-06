@@ -5,6 +5,26 @@ namespace Nokt;
 
 public class Lexer
 {
+    private static readonly IReadOnlyDictionary<string, TokenType> Keywords = new Dictionary<string, TokenType>
+    {
+        ["say"] = TokenType.Say,
+        ["import"] = TokenType.Import,
+        ["let"] = TokenType.Let,
+        ["if"] = TokenType.If,
+        ["else"] = TokenType.Else,
+        ["while"] = TokenType.While,
+        ["true"] = TokenType.True,
+        ["false"] = TokenType.False,
+        ["and"] = TokenType.And,
+        ["or"] = TokenType.Or,
+        ["not"] = TokenType.Not,
+        ["window"] = TokenType.Window,
+        ["text"] = TokenType.Text,
+        ["button"] = TokenType.Button,
+        ["input"] = TokenType.Input,
+        ["size"] = TokenType.Size
+    };
+
     private readonly string _source;
     private int _position;
     private int _line = 1;
@@ -74,6 +94,10 @@ public class Lexer
                 else
                     tokens.Add(new Token(TokenType.Equals, "=", line, column));
             }
+            else if (c == ':')
+            {
+                tokens.Add(ReadSingle(TokenType.Colon));
+            }
             else if (c == '!')
             {
                 int line = _line;
@@ -122,6 +146,18 @@ public class Lexer
             else if (c == '}')
             {
                 tokens.Add(ReadSingle(TokenType.RightBrace));
+            }
+            else if (c == '[')
+            {
+                tokens.Add(ReadSingle(TokenType.LeftBracket));
+            }
+            else if (c == ']')
+            {
+                tokens.Add(ReadSingle(TokenType.RightBracket));
+            }
+            else if (c == ',')
+            {
+                tokens.Add(ReadSingle(TokenType.Comma));
             }
             else
             {
@@ -199,49 +235,30 @@ public class Lexer
     {
         int line = _line;
         int column = _column;
-        var sb = new StringBuilder();
+        int start = _position;
 
         while (!IsAtEnd() && (IsLetter(Peek()) || IsDigit(Peek())))
         {
-            sb.Append(Advance());
+            Advance();
         }
 
-        string text = sb.ToString();
+        string text = _source[start.._position];
 
-        var keywords = new Dictionary<string, TokenType>
-        {
-            ["say"] = TokenType.Say,
-            ["let"] = TokenType.Let,
-            ["if"] = TokenType.If,
-            ["else"] = TokenType.Else,
-            ["while"] = TokenType.While,
-            ["true"] = TokenType.True,
-            ["false"] = TokenType.False,
-            ["and"] = TokenType.And,
-            ["or"] = TokenType.Or,
-            ["not"] = TokenType.Not,
-            ["window"] = TokenType.Window,
-            ["text"] = TokenType.Text,
-            ["button"] = TokenType.Button,
-            ["input"] = TokenType.Input,
-            ["size"] = TokenType.Size
-        };
-
-        return new Token(keywords.GetValueOrDefault(text, TokenType.Identifier), text, line, column);
+        return new Token(Keywords.GetValueOrDefault(text, TokenType.Identifier), text, line, column);
     }
 
     private Token ReadNumber()
     {
         int line = _line;
         int column = _column;
-        var sb = new StringBuilder();
+        int start = _position;
 
         while (!IsAtEnd() && IsDigit(Peek()))
         {
-            sb.Append(Advance());
+            Advance();
         }
 
-        return new Token(TokenType.Number, sb.ToString(), line, column);
+        return new Token(TokenType.Number, _source[start.._position], line, column);
     }
 
     private void SkipWhitespace()

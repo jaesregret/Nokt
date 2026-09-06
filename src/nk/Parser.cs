@@ -23,6 +23,24 @@ public class BooleanLiteral : Expression
     public BooleanLiteral(bool value) => Value = value;
 }
 
+public class ListExpression : Expression
+{
+    public List<Expression> Items { get; }
+    public ListExpression(List<Expression> items) => Items = items;
+}
+
+public class IndexExpression : Expression
+{
+    public Expression Collection { get; }
+    public Expression Index { get; }
+
+    public IndexExpression(Expression collection, Expression index)
+    {
+        Collection = collection;
+        Index = index;
+    }
+}
+
 public class VariableExpression : Expression
 {
     public string Name { get; }
@@ -65,14 +83,22 @@ public class SayStatement : Statement
     public SayStatement(Expression value) => Value = value;
 }
 
+public class ImportStatement : Statement
+{
+    public string Path { get; }
+    public ImportStatement(string path) => Path = path;
+}
+
 public class LetStatement : Statement
 {
     public string Name { get; }
+    public string? DeclaredType { get; }
     public Expression Value { get; }
 
-    public LetStatement(string name, Expression value)
+    public LetStatement(string name, string? declaredType, Expression value)
     {
         Name = name;
+        DeclaredType = declaredType;
         Value = value;
     }
 }
@@ -177,6 +203,13 @@ public class Parser
 
     private Statement ParseStatement()
     {
+        if (Match(TokenType.Import))
+        {
+            Token path = Consume(TokenType.String, "expected module path after 'import'");
+            RequireLineEnd("after import");
+            return new ImportStatement(path.Value);
+        }
+
         if (Match(TokenType.Say))
         {
             Expression value = ParseExpression();
@@ -197,10 +230,16 @@ public class Parser
     private LetStatement ParseLet()
     {
         Token name = Consume(TokenType.Identifier, "expected variable name after 'let'");
+        string? declaredType = null;
+        if (Match(TokenType.Colon))
+        {
+            Token type = Consume(TokenType.Identifier, "expected type name after ':'");
+            declaredType = type.Value;
+        }
         Consume(TokenType.Equals, "expected '=' after variable name");
         Expression value = ParseExpression();
         RequireLineEnd("after let assignment");
-        return new LetStatement(name.Value, value);
+        return new LetStatement(name.Value, declaredType, value);
     }
 
     private AssignmentStatement ParseAssignment()
@@ -405,19 +444,49 @@ public class Parser
 
     private Expression ParsePrimary()
     {
-        if (Match(TokenType.String)) return new StringLiteral(Previous().Value);
-        if (Match(TokenType.Number)) return new NumberLiteral(int.Parse(Previous().Value));
-        if (Match(TokenType.True)) return new BooleanLiteral(true);
-        if (Match(TokenType.False)) return new BooleanLiteral(false);
-        if (Match(TokenType.Identifier)) return new VariableExpression(Previous().Value);
-        if (Match(TokenType.LeftParen))
+        Expression expression;
+        if (Match(TokenType.String))
+            expression = new StringLiteral(Previous().Value);
+        else if (Match(TokenType.Number))
+            expression = new NumberLiteral(int.Parse(Previous().Value));
+        else if (Match(TokenType.True))
+            expression = new BooleanLiteral(true);
+        else if (Match(TokenType.False))
+            expression = new BooleanLiteral(false);
+        else if (Match(TokenType.Identifier))
+            expression = new VariableExpression(Previous().Value);
+        else if (Match(TokenType.LeftBracket))
         {
-            Expression expression = ParseExpression();
-            Consume(TokenType.RightParen, "expected ')' after expression");
-            return expression;
+            var items = new List<Expression>();
+            if (!Check(TokenType.RightBracket))
+            {
+                do
+                {
+                    items.Add(ParseExpression());
+                } while (Match(TokenType.Comma));
+            }
+            Consume(TokenType.RightBracket, "expected ']' after list");
+            expression = new ListExpression(items);
         }
-        Token unexpected = Peek();
-        throw Error($"expected expression, found '{Display(unexpected)}'", unexpected);
+        else if (Match(TokenType.LeftParen))
+        {
+            expression = ParseExpression();
+            Consume(TokenType.RightParen, "expected ')' after expression");
+        }
+        else
+        {
+            Token unexpected = Peek();
+            throw Error($"expected expression, found '{Display(unexpected)}'", unexpected);
+        }
+
+        while (Match(TokenType.LeftBracket))
+        {
+            Expression index = ParseExpression();
+            Consume(TokenType.RightBracket, "expected ']' after index");
+            expression = new IndexExpression(expression, index);
+        }
+
+        return expression;
     }
 
     private void RequireNewLine(string context)

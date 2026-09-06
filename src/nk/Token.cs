@@ -3,6 +3,7 @@ namespace Nokt;
 public enum TokenType
 {
     Say,
+    Import,
     Let,
     If,
     Else,
@@ -17,6 +18,7 @@ public enum TokenType
     Button,
     Input,
     Size,
+    Colon,
     String,
     Number,
     Identifier,
@@ -35,6 +37,9 @@ public enum TokenType
     RightParen,
     LeftBrace,
     RightBrace,
+    LeftBracket,
+    RightBracket,
+    Comma,
     NewLine,
     Indent,
     Dedent,

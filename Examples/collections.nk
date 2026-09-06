@@ -1,0 +1,6 @@
+let values: list = [10, 20, 30]
+say values[0]
+say values[1] + values[2]
+
+let nested = [[1, 2], [3, 4]]
+say nested[1][0]
