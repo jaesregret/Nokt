@@ -4,6 +4,7 @@ var tests = new (string Name, Action Run)[]
 {
     ("returns values and accepts typed parameters", TestReturnValue),
     ("captures closure variables", TestClosure),
+    ("returns closures that keep captured environments", TestReturnedClosure),
     ("supports recursion", TestRecursion),
     ("preserves returned value types", TestReturnTypes),
     ("supports parameter shadowing", TestParameterShadowing),
@@ -40,6 +41,12 @@ static void TestRecursion()
 {
     string output = Run("fn factorial(value: int)\n    if value == 0\n        return 1\n    return value * factorial(value - 1)\n\nsay factorial(5)\n");
     AssertEqual("120", output.Trim());
+}
+
+static void TestReturnedClosure()
+{
+    string output = Run("fn makeAdder(base: int)\n    fn add(value: int)\n        return base + value\n    return add\n\nlet add10 = makeAdder(10)\nsay add10(5)\n");
+    AssertEqual("15", output.Trim());
 }
 
 static void TestReturnTypes()
