@@ -61,10 +61,31 @@ public sealed class Variable
     }
 }
 
+public sealed class FunctionValue
+{
+    public FunctionStatement Declaration { get; }
+    public Environment Closure { get; }
+
+    public FunctionValue(FunctionStatement declaration, Environment closure)
+    {
+        Declaration = declaration;
+        Closure = closure;
+    }
+}
+
+public sealed class VoidValue
+{
+    public static VoidValue Instance { get; } = new();
+    private VoidValue() { }
+    public override string ToString() => string.Empty;
+}
+
 public enum ValueType
 {
     Int,
     String,
     Bool,
-    List
+    List,
+    Function,
+    Void
 }

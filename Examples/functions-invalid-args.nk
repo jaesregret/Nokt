@@ -1,0 +1,4 @@
+fn add(a: int, b: int)
+    return a + b
+
+say add(10)

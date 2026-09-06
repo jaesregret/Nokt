@@ -3,6 +3,8 @@ namespace Nokt;
 public enum TokenType
 {
     Say,
+    Fn,
+    Return,
     Import,
     Let,
     If,

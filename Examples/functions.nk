@@ -1,0 +1,11 @@
+fn add(a: int, b: int)
+    return a + b
+
+let result = add(10, 20)
+say result
+
+fn test()
+    let x = 10
+    say x
+
+test()

@@ -5,6 +5,8 @@ namespace Nokt;
 public abstract class Statement { }
 public abstract class Expression { }
 
+public sealed record FunctionParameter(string Name, string? DeclaredType);
+
 public class StringLiteral : Expression
 {
     public string Value { get; }
@@ -203,6 +205,9 @@ public class Parser
 
     private Statement ParseStatement()
     {
+        if (Match(TokenType.Fn)) return ParseFunction();
+        if (Match(TokenType.Return)) return ParseReturn();
+
         if (Match(TokenType.Import))
         {
             Token path = Consume(TokenType.String, "expected module path after 'import'");
@@ -223,8 +228,43 @@ public class Parser
         if (Match(TokenType.While)) return ParseWhile();
         if (Match(TokenType.Window)) return ParseWindow();
 
-        Token unexpected = Peek();
-        throw Error($"expected 'say', 'let', assignment, 'if' or 'while', found '{Display(unexpected)}'", unexpected);
+        Expression expression = ParseExpression();
+        RequireLineEnd("after expression");
+        return new ExpressionStatement(expression);
+    }
+
+    private FunctionStatement ParseFunction()
+    {
+        Token name = Consume(TokenType.Identifier, "expected function name after 'fn'");
+        Consume(TokenType.LeftParen, "expected '(' after function name");
+        var parameters = new List<FunctionParameter>();
+        if (!Check(TokenType.RightParen))
+        {
+            do
+            {
+                Token parameter = Consume(TokenType.Identifier, "expected parameter name");
+                string? declaredType = null;
+                if (Match(TokenType.Colon))
+                    declaredType = Consume(TokenType.Identifier, "expected parameter type after ':'").Value;
+                parameters.Add(new FunctionParameter(parameter.Value, declaredType));
+            } while (Match(TokenType.Comma));
+        }
+        Consume(TokenType.RightParen, "expected ')' after function parameters");
+        RequireNewLine("after function declaration");
+        return new FunctionStatement(name.Value, parameters, ParseIndentedBlock("function"));
+    }
+
+    private ReturnStatement ParseReturn()
+    {
+        if (Check(TokenType.NewLine) || Check(TokenType.Dedent) || IsAtEnd())
+        {
+            RequireLineEnd("after return");
+            return new ReturnStatement(null);
+        }
+
+        Expression value = ParseExpression();
+        RequireLineEnd("after return value");
+        return new ReturnStatement(value);
     }
 
     private LetStatement ParseLet()
@@ -486,6 +526,20 @@ public class Parser
             expression = new IndexExpression(expression, index);
         }
 
+        while (Match(TokenType.LeftParen))
+        {
+            var arguments = new List<Expression>();
+            if (!Check(TokenType.RightParen))
+            {
+                do
+                {
+                    arguments.Add(ParseExpression());
+                } while (Match(TokenType.Comma));
+            }
+            Consume(TokenType.RightParen, "expected ')' after function arguments");
+            expression = new CallExpression(expression, arguments);
+        }
+
         return expression;
     }
 
@@ -540,4 +594,42 @@ public class Parser
     private static string Display(Token token) => string.IsNullOrEmpty(token.Value) ? token.Type.ToString() : token.Value;
     private static NoktException Error(string message, Token token) =>
         new($"{message} at line {token.Line}, column {token.Column}; token/value '{Display(token)}'");
+}
+
+public class CallExpression : Expression
+{
+    public Expression Callee { get; }
+    public List<Expression> Arguments { get; }
+
+    public CallExpression(Expression callee, List<Expression> arguments)
+    {
+        Callee = callee;
+        Arguments = arguments;
+    }
+}
+
+public class ExpressionStatement : Statement
+{
+    public Expression Expression { get; }
+    public ExpressionStatement(Expression expression) => Expression = expression;
+}
+
+public class FunctionStatement : Statement
+{
+    public string Name { get; }
+    public List<FunctionParameter> Parameters { get; }
+    public List<Statement> Body { get; }
+
+    public FunctionStatement(string name, List<FunctionParameter> parameters, List<Statement> body)
+    {
+        Name = name;
+        Parameters = parameters;
+        Body = body;
+    }
+}
+
+public class ReturnStatement : Statement
+{
+    public Expression? Value { get; }
+    public ReturnStatement(Expression? value) => Value = value;
 }

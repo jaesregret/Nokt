@@ -11,6 +11,7 @@ public class Interpreter
     private readonly XUi _xui = new();
     private Environment _currentEnvironment;
     private string _currentModulePath = string.Empty;
+    private int _functionDepth;
 
     public Interpreter(Func<string, string, ModuleSource>? moduleLoader = null)
     {
@@ -56,6 +57,16 @@ public class Interpreter
             case SayStatement say:
                 Console.WriteLine(Evaluate(say.Value));
                 break;
+            case ExpressionStatement expression:
+                Evaluate(expression.Expression);
+                break;
+            case FunctionStatement function:
+                _currentEnvironment.Define(function.Name, new Variable(ValueType.Function, new FunctionValue(function, _currentEnvironment)));
+                break;
+            case ReturnStatement returnStatement:
+                if (_functionDepth == 0)
+                    throw new NoktException("return can only be used inside a function");
+                throw new ReturnSignal(returnStatement.Value is null ? null : Evaluate(returnStatement.Value));
             case LetStatement let:
                 object letValue = Evaluate(let.Value);
                 ValueType type = let.DeclaredType is null
@@ -125,6 +136,8 @@ public class Interpreter
                 throw new NoktException($"undefined variable '{variable.Name}'");
             case IndexExpression index:
                 return EvaluateIndex(index);
+            case CallExpression call:
+                return EvaluateCall(call);
             case UnaryExpression unary:
                 return EvaluateUnary(unary);
             case BinaryExpression binary:
@@ -155,6 +168,49 @@ public class Interpreter
         if (index < 0 || index >= values.Count)
             throw new NoktException($"collection index {index} is outside 0..{values.Count - 1}");
         return values[index];
+    }
+
+    private object EvaluateCall(CallExpression expression)
+    {
+        object callee = Evaluate(expression.Callee);
+        if (callee is not FunctionValue function)
+            throw new NoktException("only functions can be called");
+
+        if (expression.Arguments.Count != function.Declaration.Parameters.Count)
+        {
+            throw new NoktException(
+                $"function '{function.Declaration.Name}' expected {function.Declaration.Parameters.Count} argument(s), " +
+                $"got {expression.Arguments.Count}");
+        }
+
+        var arguments = expression.Arguments.Select(Evaluate).ToList();
+        Environment callEnvironment = function.Closure.CreateChild(ScopeKind.Local);
+        for (int index = 0; index < function.Declaration.Parameters.Count; index++)
+        {
+            FunctionParameter parameter = function.Declaration.Parameters[index];
+            object argument = arguments[index];
+            ValueType type = parameter.DeclaredType is null
+                ? GetValueType(argument)
+                : ParseType(parameter.DeclaredType, parameter.Name);
+            EnsureType(type, argument, parameter.Name);
+            callEnvironment.Define(parameter.Name, new Variable(type, argument));
+        }
+
+        _functionDepth++;
+        try
+        {
+            ExecuteInEnvironment(function.Declaration.Body, callEnvironment);
+        }
+        catch (ReturnSignal result)
+        {
+            return result.Value ?? VoidValue.Instance;
+        }
+        finally
+        {
+            _functionDepth--;
+        }
+
+        return VoidValue.Instance;
     }
 
     private object EvaluateBinary(BinaryExpression expression)
@@ -201,6 +257,8 @@ public class Interpreter
         string => ValueType.String,
         bool => ValueType.Bool,
         List<object> => ValueType.List,
+        FunctionValue => ValueType.Function,
+        VoidValue => ValueType.Void,
         _ => throw new NoktException($"unsupported value type '{value.GetType().Name}'")
     };
 
@@ -210,6 +268,8 @@ public class Interpreter
         "string" => ValueType.String,
         "bool" => ValueType.Bool,
         "list" => ValueType.List,
+        "function" => ValueType.Function,
+        "void" => ValueType.Void,
         _ => throw new NoktException($"unknown type '{type}' for variable '{variableName}'")
     };
 
@@ -226,6 +286,8 @@ public class Interpreter
         ValueType.String => "string",
         ValueType.Bool => "bool",
         ValueType.List => "list",
+        ValueType.Function => "function",
+        ValueType.Void => "void",
         _ => "unknown"
     };
 
@@ -257,6 +319,12 @@ public class Interpreter
 
     private static NoktException OperatorError(string message, Token token) =>
         new($"{message} at line {token.Line}, column {token.Column}; token/value '{token.Value}'");
+
+    private sealed class ReturnSignal : Exception
+    {
+        public object? Value { get; }
+        public ReturnSignal(object? value) => Value = value;
+    }
 }
 
 public sealed record ModuleSource(string Path, List<Statement> Statements);

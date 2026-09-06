@@ -8,6 +8,8 @@ public class Lexer
     private static readonly IReadOnlyDictionary<string, TokenType> Keywords = new Dictionary<string, TokenType>
     {
         ["say"] = TokenType.Say,
+        ["fn"] = TokenType.Fn,
+        ["return"] = TokenType.Return,
         ["import"] = TokenType.Import,
         ["let"] = TokenType.Let,
         ["if"] = TokenType.If,

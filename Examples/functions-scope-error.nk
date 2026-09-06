@@ -1,0 +1,6 @@
+fn test()
+    let x = 10
+    say x
+
+test()
+say x
