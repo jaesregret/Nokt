@@ -3,6 +3,9 @@ using Nokt;
 var tests = new (string Name, Action Run)[]
 {
     ("returns values and accepts typed parameters", TestReturnValue),
+    ("captures closure variables", TestClosure),
+    ("supports recursion", TestRecursion),
+    ("preserves returned value types", TestReturnTypes),
     ("supports parameter shadowing", TestParameterShadowing),
     ("keeps function locals private", TestFunctionScope),
     ("rejects invalid argument counts", TestArgumentCount),
@@ -25,6 +28,24 @@ static void TestParameterShadowing()
 {
     string output = Run("let value = 1\nfn show(value: int)\n    return value\nsay show(2)\n");
     AssertEqual("2", output.Trim());
+}
+
+static void TestClosure()
+{
+    string output = Run("fn makeAdder(base: int)\n    fn add(value: int)\n        return base + value\n    return add(5)\n\nsay makeAdder(10)\n");
+    AssertEqual("15", output.Trim());
+}
+
+static void TestRecursion()
+{
+    string output = Run("fn factorial(value: int)\n    if value == 0\n        return 1\n    return value * factorial(value - 1)\n\nsay factorial(5)\n");
+    AssertEqual("120", output.Trim());
+}
+
+static void TestReturnTypes()
+{
+    string output = Run("fn number()\n    return 42\nfn getText()\n    return \"ok\"\nsay number() + 1\nsay getText() + \"!\"\n");
+    AssertEqual("43\r\nok!", output.Trim());
 }
 
 static void TestFunctionScope()
