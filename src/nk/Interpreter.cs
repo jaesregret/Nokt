@@ -5,25 +5,35 @@ namespace Nokt;
 
 public class Interpreter
 {
-    private readonly Dictionary<string, Variable> _variables = new();
+    private readonly Environment _globalEnvironment = new(ScopeKind.Global);
     private readonly HashSet<string> _loadedModules = new(StringComparer.OrdinalIgnoreCase);
     private readonly Func<string, string, ModuleSource>? _moduleLoader;
     private readonly XUi _xui = new();
+    private Environment _currentEnvironment;
     private string _currentModulePath = string.Empty;
 
     public Interpreter(Func<string, string, ModuleSource>? moduleLoader = null)
     {
         _moduleLoader = moduleLoader;
+        _currentEnvironment = _globalEnvironment;
     }
 
     public void Execute(List<Statement> statements, string modulePath = "")
     {
+        ExecuteInEnvironment(statements, _globalEnvironment, modulePath);
+    }
+
+    private void ExecuteInEnvironment(List<Statement> statements, Environment environment, string modulePath = "")
+    {
+        Environment previousEnvironment = _currentEnvironment;
         string previousModulePath = _currentModulePath;
+        _currentEnvironment = environment;
         if (!string.IsNullOrEmpty(modulePath))
         {
             _currentModulePath = modulePath;
             _loadedModules.Add(modulePath);
         }
+
         try
         {
             foreach (Statement statement in statements)
@@ -31,6 +41,7 @@ public class Interpreter
         }
         finally
         {
+            _currentEnvironment = previousEnvironment;
             _currentModulePath = previousModulePath;
         }
     }
@@ -51,27 +62,28 @@ public class Interpreter
                     ? GetValueType(letValue)
                     : ParseType(let.DeclaredType, let.Name);
                 EnsureType(type, letValue, let.Name);
-                _variables[let.Name] = new Variable(type, letValue);
+                _currentEnvironment.Define(let.Name, new Variable(type, letValue));
                 break;
             case AssignmentStatement assignment:
-                if (!_variables.TryGetValue(assignment.Name, out Variable? variable))
-                    throw new NoktException($"cannot assign undefined variable '{assignment.Name}'");
                 object assignmentValue = Evaluate(assignment.Value);
+                if (!_currentEnvironment.TryGet(assignment.Name, out Variable? variable) || variable is null)
+                    throw new NoktException($"cannot assign undefined variable '{assignment.Name}'");
                 EnsureType(variable.Type, assignmentValue, assignment.Name);
-                variable.Value = assignmentValue;
+                _currentEnvironment.TryAssign(assignment.Name, assignmentValue, out _);
                 break;
             case IfStatement conditional:
                 if (RequireBoolean(Evaluate(conditional.Condition), "if condition"))
-                    Execute(conditional.ThenBranch);
+                    ExecuteLocalBlock(conditional.ThenBranch);
                 else if (conditional.ElseBranch is not null)
-                    Execute(conditional.ElseBranch);
+                    ExecuteLocalBlock(conditional.ElseBranch);
                 break;
             case WhileStatement loop:
+                Environment loopEnvironment = _currentEnvironment.CreateChild(ScopeKind.Local);
                 while (RequireBoolean(Evaluate(loop.Condition), "while condition"))
-                    Execute(loop.Body);
+                    ExecuteInEnvironment(loop.Body, loopEnvironment);
                 break;
             case WindowStatement window:
-                _xui.Show(window.Window, statements => Execute(statements));
+                _xui.Show(window.Window, statements => ExecuteLocalBlock(statements));
                 break;
             default:
                 throw new NoktException("unknown statement type");
@@ -85,7 +97,15 @@ public class Interpreter
 
         ModuleSource module = _moduleLoader(requestedPath, _currentModulePath);
         if (!_loadedModules.Add(module.Path)) return;
-        Execute(module.Statements, module.Path);
+        Environment moduleEnvironment = _currentEnvironment.CreateChild(ScopeKind.Module);
+        ExecuteInEnvironment(module.Statements, moduleEnvironment, module.Path);
+        foreach (KeyValuePair<string, Variable> variable in moduleEnvironment.LocalVariables)
+            _currentEnvironment.Define(variable.Key, variable.Value);
+    }
+
+    private void ExecuteLocalBlock(List<Statement> statements)
+    {
+        ExecuteInEnvironment(statements, _currentEnvironment.CreateChild(ScopeKind.Local));
     }
 
     private object Evaluate(Expression expression)
@@ -101,7 +121,7 @@ public class Interpreter
             case ListExpression list:
                 return list.Items.Select(Evaluate).ToList();
             case VariableExpression variable:
-                if (_variables.TryGetValue(variable.Name, out Variable? value)) return value.Value;
+                if (_currentEnvironment.TryGet(variable.Name, out Variable? value) && value is not null) return value.Value;
                 throw new NoktException($"undefined variable '{variable.Name}'");
             case IndexExpression index:
                 return EvaluateIndex(index);
@@ -208,26 +228,6 @@ public class Interpreter
         ValueType.List => "list",
         _ => "unknown"
     };
-
-    private sealed class Variable
-    {
-        public ValueType Type { get; }
-        public object Value { get; set; }
-
-        public Variable(ValueType type, object value)
-        {
-            Type = type;
-            Value = value;
-        }
-    }
-
-    private enum ValueType
-    {
-        Int,
-        String,
-        Bool,
-        List
-    }
 
     private static int Arithmetic(object left, object right, Token token, Func<int, int, int> operation) =>
         operation(RequireInteger(left, "left operand", token), RequireInteger(right, "right operand", token));

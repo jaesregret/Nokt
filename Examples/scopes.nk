@@ -1,0 +1,13 @@
+let value: int = 1
+
+if true
+    let value: int = 2
+    say value
+
+say value
+
+let counter: int = 0
+while counter < 2
+    counter = counter + 1
+
+say counter

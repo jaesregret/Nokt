@@ -4,6 +4,7 @@
 ## What it can do
 * **Display messages:** Uses the `say` command to print output.
 * **Store values:** Uses `let` to declare variables and `=` to update them.
+* **Use nested scopes:** Supports global, local, and module environments with parent lookup and variable shadowing.
 * **Support multiple data types:** Handles text (strings), numbers (integers), booleans (`true`/`false`), and variable references.
 * **Perform math and combine text:** Standard arithmetic (`+`, `-`, `*`, `/`) with parentheses support, plus string concatenation.
 * **Compare and evaluate logic:** Checks equalities and inequalities (`==`, `>`, `<`, etc.) and uses logical operators (`and`, `or`, `not`).
@@ -27,3 +28,4 @@ dotnet run --project src/nk/Nokt.csproj -- Examples/ui.nk
 ```
 
 Legacy examples are also available at `Examples/hello.nk` and `Examples/vars.nk`.
+The scope example is available at `Examples/scopes.nk`.
