@@ -5,29 +5,60 @@ namespace Nokt;
 
 public class Interpreter
 {
-    private readonly Dictionary<string, object> _variables = new();
+    private readonly Dictionary<string, Variable> _variables = new();
+    private readonly HashSet<string> _loadedModules = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Func<string, string, ModuleSource>? _moduleLoader;
     private readonly XUi _xui = new();
+    private string _currentModulePath = string.Empty;
 
-    public void Execute(List<Statement> statements)
+    public Interpreter(Func<string, string, ModuleSource>? moduleLoader = null)
     {
-        foreach (Statement statement in statements)
-            ExecuteStatement(statement);
+        _moduleLoader = moduleLoader;
+    }
+
+    public void Execute(List<Statement> statements, string modulePath = "")
+    {
+        string previousModulePath = _currentModulePath;
+        if (!string.IsNullOrEmpty(modulePath))
+        {
+            _currentModulePath = modulePath;
+            _loadedModules.Add(modulePath);
+        }
+        try
+        {
+            foreach (Statement statement in statements)
+                ExecuteStatement(statement);
+        }
+        finally
+        {
+            _currentModulePath = previousModulePath;
+        }
     }
 
     private void ExecuteStatement(Statement statement)
     {
         switch (statement)
         {
+            case ImportStatement import:
+                ExecuteImport(import.Path);
+                break;
             case SayStatement say:
                 Console.WriteLine(Evaluate(say.Value));
                 break;
             case LetStatement let:
-                _variables[let.Name] = Evaluate(let.Value);
+                object letValue = Evaluate(let.Value);
+                ValueType type = let.DeclaredType is null
+                    ? GetValueType(letValue)
+                    : ParseType(let.DeclaredType, let.Name);
+                EnsureType(type, letValue, let.Name);
+                _variables[let.Name] = new Variable(type, letValue);
                 break;
             case AssignmentStatement assignment:
-                if (!_variables.ContainsKey(assignment.Name))
+                if (!_variables.TryGetValue(assignment.Name, out Variable? variable))
                     throw new NoktException($"cannot assign undefined variable '{assignment.Name}'");
-                _variables[assignment.Name] = Evaluate(assignment.Value);
+                object assignmentValue = Evaluate(assignment.Value);
+                EnsureType(variable.Type, assignmentValue, assignment.Name);
+                variable.Value = assignmentValue;
                 break;
             case IfStatement conditional:
                 if (RequireBoolean(Evaluate(conditional.Condition), "if condition"))
@@ -40,11 +71,21 @@ public class Interpreter
                     Execute(loop.Body);
                 break;
             case WindowStatement window:
-                _xui.Show(window.Window, Execute);
+                _xui.Show(window.Window, statements => Execute(statements));
                 break;
             default:
                 throw new NoktException("unknown statement type");
         }
+    }
+
+    private void ExecuteImport(string requestedPath)
+    {
+        if (_moduleLoader is null)
+            throw new NoktException("modules require a file-based interpreter entry point");
+
+        ModuleSource module = _moduleLoader(requestedPath, _currentModulePath);
+        if (!_loadedModules.Add(module.Path)) return;
+        Execute(module.Statements, module.Path);
     }
 
     private object Evaluate(Expression expression)
@@ -57,9 +98,13 @@ public class Interpreter
                 return number.Value;
             case BooleanLiteral boolean:
                 return boolean.Value;
+            case ListExpression list:
+                return list.Items.Select(Evaluate).ToList();
             case VariableExpression variable:
-                if (_variables.TryGetValue(variable.Name, out object? value)) return value;
+                if (_variables.TryGetValue(variable.Name, out Variable? value)) return value.Value;
                 throw new NoktException($"undefined variable '{variable.Name}'");
+            case IndexExpression index:
+                return EvaluateIndex(index);
             case UnaryExpression unary:
                 return EvaluateUnary(unary);
             case BinaryExpression binary:
@@ -77,6 +122,19 @@ public class Interpreter
         if (expression.Operator == "-")
             return -RequireInteger(value, "unary '-'", expression.Token);
         throw OperatorError($"unknown unary operator '{expression.Operator}'", expression.Token);
+    }
+
+    private object EvaluateIndex(IndexExpression expression)
+    {
+        object collection = Evaluate(expression.Collection);
+        object indexValue = Evaluate(expression.Index);
+        if (indexValue is not int index)
+            throw new NoktException("collection index must be an integer");
+        if (collection is not List<object> values)
+            throw new NoktException($"cannot index value of type '{TypeName(GetValueType(collection))}'");
+        if (index < 0 || index >= values.Count)
+            throw new NoktException($"collection index {index} is outside 0..{values.Count - 1}");
+        return values[index];
     }
 
     private object EvaluateBinary(BinaryExpression expression)
@@ -117,6 +175,60 @@ public class Interpreter
         throw OperatorError("operator '+' requires two integers or two strings", token);
     }
 
+    private static ValueType GetValueType(object value) => value switch
+    {
+        int => ValueType.Int,
+        string => ValueType.String,
+        bool => ValueType.Bool,
+        List<object> => ValueType.List,
+        _ => throw new NoktException($"unsupported value type '{value.GetType().Name}'")
+    };
+
+    private static ValueType ParseType(string type, string variableName) => type switch
+    {
+        "int" => ValueType.Int,
+        "string" => ValueType.String,
+        "bool" => ValueType.Bool,
+        "list" => ValueType.List,
+        _ => throw new NoktException($"unknown type '{type}' for variable '{variableName}'")
+    };
+
+    private static void EnsureType(ValueType expected, object value, string variableName)
+    {
+        ValueType actual = GetValueType(value);
+        if (expected != actual)
+            throw new NoktException($"variable '{variableName}' is '{TypeName(expected)}' but received '{TypeName(actual)}'");
+    }
+
+    private static string TypeName(ValueType type) => type switch
+    {
+        ValueType.Int => "int",
+        ValueType.String => "string",
+        ValueType.Bool => "bool",
+        ValueType.List => "list",
+        _ => "unknown"
+    };
+
+    private sealed class Variable
+    {
+        public ValueType Type { get; }
+        public object Value { get; set; }
+
+        public Variable(ValueType type, object value)
+        {
+            Type = type;
+            Value = value;
+        }
+    }
+
+    private enum ValueType
+    {
+        Int,
+        String,
+        Bool,
+        List
+    }
+
     private static int Arithmetic(object left, object right, Token token, Func<int, int, int> operation) =>
         operation(RequireInteger(left, "left operand", token), RequireInteger(right, "right operand", token));
 
@@ -146,3 +258,5 @@ public class Interpreter
     private static NoktException OperatorError(string message, Token token) =>
         new($"{message} at line {token.Line}, column {token.Column}; token/value '{token.Value}'");
 }
+
+public sealed record ModuleSource(string Path, List<Statement> Statements);

@@ -6,6 +6,9 @@ class Program
 {
     static int Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--lsp")
+            return NoktLanguageServer.Run();
+
         if (args.Length == 0)
         {
             Console.Error.WriteLine("Usage: Nokt <file>");
@@ -20,13 +23,10 @@ class Program
 
         try
         {
-            string source = File.ReadAllText(filePath);
-            var lexer = new Lexer(source);
-            var tokens = lexer.Tokenize();
-            var parser = new Parser(tokens);
-            var statements = parser.Parse();
-            var interpreter = new Interpreter();
-            interpreter.Execute(statements);
+            string fullPath = Path.GetFullPath(filePath);
+            List<Statement> statements = ParseFile(fullPath);
+            var interpreter = new Interpreter(LoadModule);
+            interpreter.Execute(statements, fullPath);
         }
         catch (NoktException ex)
         {
@@ -39,5 +39,24 @@ class Program
             return 1;
         }
         return 0;
+    }
+
+    private static ModuleSource LoadModule(string requestedPath, string importerPath)
+    {
+        string baseDirectory = Path.GetDirectoryName(importerPath) ?? Directory.GetCurrentDirectory();
+        string modulePath = Path.GetFullPath(Path.Combine(baseDirectory, requestedPath));
+        if (Path.GetExtension(modulePath).Length == 0) modulePath += ".nk";
+        return new ModuleSource(modulePath, ParseFile(modulePath));
+    }
+
+    private static List<Statement> ParseFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+            throw new NoktException($"module file '{filePath}' not found");
+
+        string source = File.ReadAllText(filePath);
+        var lexer = new Lexer(source);
+        var parser = new Parser(lexer.Tokenize());
+        return parser.Parse();
     }
 }
