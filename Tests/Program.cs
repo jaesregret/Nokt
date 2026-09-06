@@ -52,7 +52,7 @@ static void TestReturnedClosure()
 static void TestReturnTypes()
 {
     string output = Run("fn number()\n    return 42\nfn getText()\n    return \"ok\"\nsay number() + 1\nsay getText() + \"!\"\n");
-    AssertEqual("43\r\nok!", output.Trim());
+    AssertEqual("43\nok!", output.Trim());
 }
 
 static void TestFunctionScope()
@@ -79,7 +79,7 @@ static string Run(string source)
     {
         var statements = new Parser(new Lexer(source).Tokenize()).Parse();
         new Interpreter().Execute(statements);
-        return writer.ToString();
+        return writer.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
     }
     finally
     {
