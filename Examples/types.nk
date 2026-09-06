@@ -1,0 +1,10 @@
+let age: int = 12
+let name: string = "Jae"
+let active: bool = true
+
+say name
+say age
+say active
+
+age = age + 1
+say age
