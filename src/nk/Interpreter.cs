@@ -122,7 +122,7 @@ public class Interpreter
         }
         else
         {
-            foreach (KeyValuePair<string, Variable> variable in moduleEnvironment.LocalVariables)
+            foreach (KeyValuePair<string, Variable> variable in moduleEnvironment.ExportedVariables)
                 _currentEnvironment.Define(variable.Key, variable.Value);
         }
     }

@@ -1,2 +1,2 @@
 import "module.nk"
-say greeting
+say greeting()

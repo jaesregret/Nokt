@@ -15,6 +15,7 @@ var tests = new (string Name, Action Run)[]
     ("rejects invalid argument types", TestArgumentType)
     ,("supports exported module namespaces", TestModuleNamespace)
     ,("hides non-exported module members", TestPrivateModuleMember)
+    ,("hides non-exported members without aliases", TestPrivateModuleMemberWithoutAlias)
 };
 
 foreach ((string name, Action run) in tests)
@@ -106,6 +107,17 @@ static void TestPrivateModuleMember()
             ["math.nk"] = "fn hidden()\n    return 1\n"
         },
         "module has no exported member 'hidden'");
+}
+
+static void TestPrivateModuleMemberWithoutAlias()
+{
+    AssertThrowsWithModules(
+        "import \"math.nk\"\nsay hidden()\n",
+        new Dictionary<string, string>
+        {
+            ["math.nk"] = "export fn add()\n    return 1\nfn hidden()\n    return 2\n"
+        },
+        "undefined variable 'hidden'");
 }
 
 static string Run(string source)

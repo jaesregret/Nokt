@@ -1,1 +1,2 @@
-let greeting: string = "Hello from a module"
+export fn greeting()
+	return "Hello from a module"
