@@ -258,14 +258,14 @@ public class Parser
                 Token parameter = Consume(TokenType.Identifier, "expected parameter name");
                 string? declaredType = null;
                 if (Match(TokenType.Colon))
-                    declaredType = Consume(TokenType.Identifier, "expected parameter type after ':'").Value;
+                    declaredType = ParseTypeName("parameter type");
                 parameters.Add(new FunctionParameter(parameter.Value, declaredType));
             } while (Match(TokenType.Comma));
         }
         Consume(TokenType.RightParen, "expected ')' after function parameters");
         string? returnType = null;
         if (Match(TokenType.Arrow))
-            returnType = Consume(TokenType.Identifier, "expected return type after '->'").Value;
+            returnType = ParseTypeName("return type");
         RequireNewLine("after function declaration");
         return new FunctionStatement(name.Value, parameters, ParseIndentedBlock("function"), isExported, returnType);
     }
@@ -288,10 +288,7 @@ public class Parser
         Token name = Consume(TokenType.Identifier, "expected variable name after 'let'");
         string? declaredType = null;
         if (Match(TokenType.Colon))
-        {
-            Token type = Consume(TokenType.Identifier, "expected type name after ':'");
-            declaredType = type.Value;
-        }
+            declaredType = ParseTypeName("type name");
         Consume(TokenType.Equals, "expected '=' after variable name");
         Expression value = ParseExpression();
         RequireLineEnd("after let assignment");
@@ -305,6 +302,16 @@ public class Parser
         Expression value = ParseExpression();
         RequireLineEnd("after assignment");
         return new AssignmentStatement(name.Value, value);
+    }
+
+    private string ParseTypeName(string context)
+    {
+        string type = Consume(TokenType.Identifier, $"expected {context} after ':'").Value;
+        if (type != "list" || !Match(TokenType.LeftBracket)) return type;
+
+        string elementType = Consume(TokenType.Identifier, "expected list element type").Value;
+        Consume(TokenType.RightBracket, "expected ']' after list element type");
+        return $"list[{elementType}]";
     }
 
     private IfStatement ParseIf()

@@ -57,6 +57,8 @@ class Program
         string source = File.ReadAllText(filePath);
         var lexer = new Lexer(source);
         var parser = new Parser(lexer.Tokenize());
-        return parser.Parse();
+        List<Statement> statements = parser.Parse();
+        new TypeChecker().Check(statements);
+        return statements;
     }
 }

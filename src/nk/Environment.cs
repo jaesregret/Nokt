@@ -96,6 +96,16 @@ public sealed class ModuleValue
     public bool TryGet(string name, out Variable? variable) => _members.TryGetValue(name, out variable);
 }
 
+public sealed class ListValue : List<object>
+{
+    public ValueType? ElementType { get; }
+
+    public ListValue(IEnumerable<object> values, ValueType? elementType) : base(values)
+    {
+        ElementType = elementType;
+    }
+}
+
 public sealed class VoidValue
 {
     public static VoidValue Instance { get; } = new();

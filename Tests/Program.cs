@@ -16,6 +16,9 @@ var tests = new (string Name, Action Run)[]
     ,("supports exported module namespaces", TestModuleNamespace)
     ,("hides non-exported module members", TestPrivateModuleMember)
     ,("hides non-exported members without aliases", TestPrivateModuleMemberWithoutAlias)
+    ,("rejects heterogeneous lists", TestHeterogeneousLists)
+    ,("catches obvious type errors statically", TestStaticTypeErrors)
+    ,("supports typed homogeneous lists", TestTypedLists)
 };
 
 foreach ((string name, Action run) in tests)
@@ -120,6 +123,25 @@ static void TestPrivateModuleMemberWithoutAlias()
         "undefined variable 'hidden'");
 }
 
+static void TestHeterogeneousLists()
+{
+    AssertThrows("let values = [1, \"two\"]\n", "list elements must have the same type");
+}
+
+static void TestStaticTypeErrors()
+{
+    AssertStaticThrows("let values = [1, \"two\"]\n", "static type error: list elements must have the same type");
+    AssertStaticThrows("let value: int = \"wrong\"\n", "static type error: variable 'value' is 'int'");
+    AssertStaticThrows("if 1\n    say 1\n", "static type error: if condition must be 'bool'");
+}
+
+static void TestTypedLists()
+{
+    string output = Run("let values: list[int] = [1, 2, 3]\nsay values[1]\n");
+    AssertEqual("2", output.Trim());
+    AssertStaticThrows("let values: list[int] = [1, \"two\"]\n", "list elements must have the same type");
+}
+
 static string Run(string source)
 {
     var writer = new StringWriter();
@@ -134,6 +156,19 @@ static string Run(string source)
     finally
     {
         Console.SetOut(previous);
+    }
+}
+
+static void AssertStaticThrows(string source, string expectedMessage)
+{
+    try
+    {
+        var statements = new Parser(new Lexer(source).Tokenize()).Parse();
+        new TypeChecker().Check(statements);
+        throw new InvalidOperationException($"Expected static error containing '{expectedMessage}'");
+    }
+    catch (NoktException exception) when (exception.Message.Contains(expectedMessage, StringComparison.Ordinal))
+    {
     }
 }
 

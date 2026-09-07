@@ -76,6 +76,7 @@ public class Interpreter
                     ? GetValueType(letValue)
                     : ParseType(let.DeclaredType, let.Name);
                 EnsureType(type, letValue, let.Name);
+                EnsureListElementType(let.DeclaredType, letValue, let.Name);
                 _currentEnvironment.Define(let.Name, new Variable(type, letValue));
                 break;
             case AssignmentStatement assignment:
@@ -143,7 +144,7 @@ public class Interpreter
             case BooleanLiteral boolean:
                 return boolean.Value;
             case ListExpression list:
-                return list.Items.Select(Evaluate).ToList();
+                return EvaluateList(list);
             case VariableExpression variable:
                 if (_currentEnvironment.TryGet(variable.Name, out Variable? value) && value is not null) return value.Value;
                 throw new NoktException($"undefined variable '{variable.Name}'");
@@ -178,11 +179,32 @@ public class Interpreter
         object indexValue = Evaluate(expression.Index);
         if (indexValue is not int index)
             throw new NoktException("collection index must be an integer");
-        if (collection is not List<object> values)
+        if (collection is not ListValue values)
             throw new NoktException($"cannot index value of type '{TypeName(GetValueType(collection))}'");
         if (index < 0 || index >= values.Count)
             throw new NoktException($"collection index {index} is outside 0..{values.Count - 1}");
         return values[index];
+    }
+
+    private object EvaluateList(ListExpression expression)
+    {
+        var values = expression.Items.Select(Evaluate).ToList();
+        ValueType? elementType = null;
+        foreach (object value in values)
+        {
+            ValueType currentType = GetValueType(value);
+            if (elementType is null)
+            {
+                elementType = currentType;
+            }
+            else if (elementType != currentType)
+            {
+                throw new NoktException(
+                    $"list elements must have the same type, got '{TypeName(elementType.Value)}' and '{TypeName(currentType)}'");
+            }
+        }
+
+        return new ListValue(values, elementType);
     }
 
     private object EvaluateCall(CallExpression expression)
@@ -208,6 +230,7 @@ public class Interpreter
                 ? GetValueType(argument)
                 : ParseType(parameter.DeclaredType, parameter.Name);
             EnsureType(type, argument, parameter.Name);
+            EnsureListElementType(parameter.DeclaredType, argument, parameter.Name);
             callEnvironment.Define(parameter.Name, new Variable(type, argument));
         }
 
@@ -243,6 +266,7 @@ public class Interpreter
             throw new NoktException(
                 $"function '{declaration.Name}' must return '{TypeName(expected)}', got '{TypeName(actual)}'");
         }
+            EnsureListElementType(declaration.ReturnType, value, $"function '{declaration.Name}' return");
     }
 
     private object EvaluateMember(MemberExpression expression)
@@ -296,7 +320,7 @@ public class Interpreter
         int => ValueType.Int,
         string => ValueType.String,
         bool => ValueType.Bool,
-        List<object> => ValueType.List,
+        ListValue => ValueType.List,
         FunctionValue => ValueType.Function,
         ModuleValue => ValueType.Module,
         VoidValue => ValueType.Void,
@@ -312,8 +336,24 @@ public class Interpreter
         "function" => ValueType.Function,
         "module" => ValueType.Module,
         "void" => ValueType.Void,
+        _ when type.StartsWith("list[", StringComparison.Ordinal) && type.EndsWith("]", StringComparison.Ordinal)
+            => ParseType("list", variableName),
         _ => throw new NoktException($"unknown type '{type}' for variable '{variableName}'")
     };
+
+    private static void EnsureListElementType(string? declaredType, object value, string name)
+    {
+        if (declaredType is null || !declaredType.StartsWith("list[", StringComparison.Ordinal)) return;
+        if (value is not ListValue list) return;
+
+        string elementName = declaredType[5..^1];
+        ValueType expected = ParseType(elementName, name);
+        if (list.ElementType is not null && list.ElementType != expected)
+        {
+            throw new NoktException(
+                $"list '{name}' requires elements of type '{TypeName(expected)}', got '{TypeName(list.ElementType.Value)}'");
+        }
+    }
 
     private static void EnsureType(ValueType expected, object value, string variableName)
     {
