@@ -1,33 +1,39 @@
 # Nokt
-**Nokt** is a programming language built entirely from scratch using .NET 8.
+**Nokt** is a small programming(interpreter) language made from scratch with .NET 8. It is still growing, but you can already write useful little programs with it.
 
-## What it can do
-* **Display messages:** Uses the `say` command to print output.
-* **Store values:** Uses `let` to declare variables and `=` to update them.
-* **Use nested scopes:** Supports global, local, and module environments with parent lookup and variable shadowing.
-* **Define functions:** Supports `fn`, typed parameters, calls, `return`, and procedures without return values.
-* **Support multiple data types:** Handles text (strings), numbers (integers), booleans (`true`/`false`), and variable references.
-* **Perform math and combine text:** Standard arithmetic (`+`, `-`, `*`, `/`) with parentheses support, plus string concatenation.
-* **Compare and evaluate logic:** Checks equalities and inequalities (`==`, `>`, `<`, etc.) and uses logical operators (`and`, `or`, `not`).
-* **Control code flow:** Makes decisions using `if`/`else` statements and repeats actions with `while` loops.
-* **Add comments:** Allows code annotations starting with `#`.
-* **Report detailed errors:** Points out exact lines, columns, and values when lexical, syntax, or runtime errors occur.
-* **Create desktop windows (GUI):** Features basic Windows Forms support to build windows containing text inputs, buttons, and click event blocks.
+## What you can do
+- Print things with `say`.
+- Create and update variables with `let` and `=`.
+- Use strings, integers, booleans, lists, and variables.
+- Do math, string concatenation, comparisons, and logic with `and`, `or`, and `not`.
+- Control the flow with `if`, `else`, and `while`.
+- Add comments with `#`.
+- Define functions with `fn`, parameters, calls, and `return`.
+- Use closures and nested scopes, including variable shadowing.
+- Split code into modules with `export` and `import ... as ...`.
+- Build simple Windows Forms interfaces through the optional UI project.
+- Get useful lexer, parser, and runtime error messages with line and column information.
 
-## How to use
-To run a feature showcase example:
+The language core targets `net8.0` and does not depend on Windows. GUI support is optional and lives in `src/nk.Ui`, targeting `net8.0-windows`.
+
+## Running it
+To try the main example, run:
 
 ```text
 dotnet run --project src/nk/Nokt.csproj -- Examples/features.nk
 
 ```
-To run the graphical interface example (Windows only):
+The GUI example runs on Windows through the optional UI project:
 
 ```text
-dotnet run --project src/nk/Nokt.csproj -- Examples/ui.nk
+dotnet run --project src/nk.Ui/Nokt.Ui.csproj -- Examples/ui.nk
 
 ```
 
-Legacy examples are also available at `Examples/hello.nk` and `Examples/vars.nk`.
-The scope example is available at `Examples/scopes.nk`.
-Function examples are available at `Examples/functions.nk` and the test runner can be executed with `dotnet run --project Tests/Nokt.Tests.csproj`.
+There are more examples in `Examples/`, including scopes, functions, modules, collections, and the older `hello.nk` and `vars.nk` files.
+
+To run the tests:
+
+```text
+dotnet run --project Tests/Nokt.Tests.csproj
+```
