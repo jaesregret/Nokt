@@ -8,14 +8,15 @@ public class Interpreter
     private readonly Environment _globalEnvironment = new(ScopeKind.Global);
     private readonly HashSet<string> _loadedModules = new(StringComparer.OrdinalIgnoreCase);
     private readonly Func<string, string, ModuleSource>? _moduleLoader;
-    private readonly XUi _xui = new();
+    private readonly IUiHost? _uiHost;
     private Environment _currentEnvironment;
     private string _currentModulePath = string.Empty;
     private int _functionDepth;
 
-    public Interpreter(Func<string, string, ModuleSource>? moduleLoader = null)
+    public Interpreter(Func<string, string, ModuleSource>? moduleLoader = null, IUiHost? uiHost = null)
     {
         _moduleLoader = moduleLoader;
+        _uiHost = uiHost;
         _currentEnvironment = _globalEnvironment;
     }
 
@@ -52,7 +53,7 @@ public class Interpreter
         switch (statement)
         {
             case ImportStatement import:
-                ExecuteImport(import.Path);
+                ExecuteImport(import);
                 break;
             case SayStatement say:
                 Console.WriteLine(Evaluate(say.Value));
@@ -62,6 +63,8 @@ public class Interpreter
                 break;
             case FunctionStatement function:
                 _currentEnvironment.Define(function.Name, new Variable(ValueType.Function, new FunctionValue(function, _currentEnvironment)));
+                if (function.IsExported)
+                    _currentEnvironment.Export(function.Name);
                 break;
             case ReturnStatement returnStatement:
                 if (_functionDepth == 0)
@@ -94,24 +97,34 @@ public class Interpreter
                     ExecuteInEnvironment(loop.Body, loopEnvironment);
                 break;
             case WindowStatement window:
-                _xui.Show(window.Window, statements => ExecuteLocalBlock(statements));
+                if (_uiHost is null)
+                    throw new NoktException("GUI support is unavailable in the core runtime; use Nokt.Ui");
+                _uiHost.Show(window.Window, statements => ExecuteLocalBlock(statements));
                 break;
             default:
                 throw new NoktException("unknown statement type");
         }
     }
 
-    private void ExecuteImport(string requestedPath)
+    private void ExecuteImport(ImportStatement import)
     {
         if (_moduleLoader is null)
             throw new NoktException("modules require a file-based interpreter entry point");
 
-        ModuleSource module = _moduleLoader(requestedPath, _currentModulePath);
+        ModuleSource module = _moduleLoader(import.Path, _currentModulePath);
         if (!_loadedModules.Add(module.Path)) return;
         Environment moduleEnvironment = _currentEnvironment.CreateChild(ScopeKind.Module);
         ExecuteInEnvironment(module.Statements, moduleEnvironment, module.Path);
-        foreach (KeyValuePair<string, Variable> variable in moduleEnvironment.LocalVariables)
-            _currentEnvironment.Define(variable.Key, variable.Value);
+        if (import.Alias is not null)
+        {
+            ModuleValue value = new(moduleEnvironment.ExportedVariables);
+            _currentEnvironment.Define(import.Alias, new Variable(ValueType.Module, value));
+        }
+        else
+        {
+            foreach (KeyValuePair<string, Variable> variable in moduleEnvironment.LocalVariables)
+                _currentEnvironment.Define(variable.Key, variable.Value);
+        }
     }
 
     private void ExecuteLocalBlock(List<Statement> statements)
@@ -138,6 +151,8 @@ public class Interpreter
                 return EvaluateIndex(index);
             case CallExpression call:
                 return EvaluateCall(call);
+            case MemberExpression member:
+                return EvaluateMember(member);
             case UnaryExpression unary:
                 return EvaluateUnary(unary);
             case BinaryExpression binary:
@@ -203,14 +218,39 @@ public class Interpreter
         }
         catch (ReturnSignal result)
         {
-            return result.Value ?? VoidValue.Instance;
+            object returnValue = result.Value ?? VoidValue.Instance;
+            EnsureReturnType(function.Declaration, returnValue);
+            return returnValue;
         }
         finally
         {
             _functionDepth--;
         }
 
-        return VoidValue.Instance;
+        object implicitReturn = VoidValue.Instance;
+        EnsureReturnType(function.Declaration, implicitReturn);
+        return implicitReturn;
+    }
+
+    private static void EnsureReturnType(FunctionStatement declaration, object value)
+    {
+        if (declaration.ReturnType is null) return;
+
+        ValueType expected = ParseType(declaration.ReturnType, $"function '{declaration.Name}' return");
+        ValueType actual = GetValueType(value);
+        if (expected != actual)
+        {
+            throw new NoktException(
+                $"function '{declaration.Name}' must return '{TypeName(expected)}', got '{TypeName(actual)}'");
+        }
+    }
+
+    private object EvaluateMember(MemberExpression expression)
+    {
+        object value = Evaluate(expression.Object);
+        if (value is ModuleValue module && module.TryGet(expression.Name, out Variable? member) && member is not null)
+            return member.Value;
+        throw new NoktException($"module has no exported member '{expression.Name}'");
     }
 
     private object EvaluateBinary(BinaryExpression expression)
@@ -258,6 +298,7 @@ public class Interpreter
         bool => ValueType.Bool,
         List<object> => ValueType.List,
         FunctionValue => ValueType.Function,
+        ModuleValue => ValueType.Module,
         VoidValue => ValueType.Void,
         _ => throw new NoktException($"unsupported value type '{value.GetType().Name}'")
     };
@@ -269,6 +310,7 @@ public class Interpreter
         "bool" => ValueType.Bool,
         "list" => ValueType.List,
         "function" => ValueType.Function,
+        "module" => ValueType.Module,
         "void" => ValueType.Void,
         _ => throw new NoktException($"unknown type '{type}' for variable '{variableName}'")
     };
@@ -287,6 +329,7 @@ public class Interpreter
         ValueType.Bool => "bool",
         ValueType.List => "list",
         ValueType.Function => "function",
+        ValueType.Module => "module",
         ValueType.Void => "void",
         _ => "unknown"
     };

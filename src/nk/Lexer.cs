@@ -10,7 +10,9 @@ public class Lexer
         ["say"] = TokenType.Say,
         ["fn"] = TokenType.Fn,
         ["return"] = TokenType.Return,
+        ["export"] = TokenType.Export,
         ["import"] = TokenType.Import,
+        ["as"] = TokenType.As,
         ["let"] = TokenType.Let,
         ["if"] = TokenType.If,
         ["else"] = TokenType.Else,
@@ -123,7 +125,13 @@ public class Lexer
             }
             else if (c == '-')
             {
-                tokens.Add(ReadSingle(TokenType.Minus));
+                int line = _line;
+                int column = _column;
+                Advance();
+                if (MatchCharacter('>'))
+                    tokens.Add(new Token(TokenType.Arrow, "->", line, column));
+                else
+                    tokens.Add(new Token(TokenType.Minus, "-", line, column));
             }
             else if (c == '*')
             {
@@ -160,6 +168,10 @@ public class Lexer
             else if (c == ',')
             {
                 tokens.Add(ReadSingle(TokenType.Comma));
+            }
+            else if (c == '.')
+            {
+                tokens.Add(ReadSingle(TokenType.Dot));
             }
             else
             {

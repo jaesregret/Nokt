@@ -88,7 +88,12 @@ public class SayStatement : Statement
 public class ImportStatement : Statement
 {
     public string Path { get; }
-    public ImportStatement(string path) => Path = path;
+    public string? Alias { get; }
+    public ImportStatement(string path, string? alias)
+    {
+        Path = path;
+        Alias = alias;
+    }
 }
 
 public class LetStatement : Statement
@@ -205,14 +210,22 @@ public class Parser
 
     private Statement ParseStatement()
     {
+        if (Match(TokenType.Export))
+        {
+            Consume(TokenType.Fn, "expected 'fn' after 'export'");
+            return ParseFunction(true);
+        }
         if (Match(TokenType.Fn)) return ParseFunction();
         if (Match(TokenType.Return)) return ParseReturn();
 
         if (Match(TokenType.Import))
         {
             Token path = Consume(TokenType.String, "expected module path after 'import'");
+            string? alias = null;
+            if (Match(TokenType.As))
+                alias = Consume(TokenType.Identifier, "expected module alias after 'as'").Value;
             RequireLineEnd("after import");
-            return new ImportStatement(path.Value);
+            return new ImportStatement(path.Value, alias);
         }
 
         if (Match(TokenType.Say))
@@ -233,7 +246,7 @@ public class Parser
         return new ExpressionStatement(expression);
     }
 
-    private FunctionStatement ParseFunction()
+    private FunctionStatement ParseFunction(bool isExported = false)
     {
         Token name = Consume(TokenType.Identifier, "expected function name after 'fn'");
         Consume(TokenType.LeftParen, "expected '(' after function name");
@@ -250,8 +263,11 @@ public class Parser
             } while (Match(TokenType.Comma));
         }
         Consume(TokenType.RightParen, "expected ')' after function parameters");
+        string? returnType = null;
+        if (Match(TokenType.Arrow))
+            returnType = Consume(TokenType.Identifier, "expected return type after '->'").Value;
         RequireNewLine("after function declaration");
-        return new FunctionStatement(name.Value, parameters, ParseIndentedBlock("function"));
+        return new FunctionStatement(name.Value, parameters, ParseIndentedBlock("function"), isExported, returnType);
     }
 
     private ReturnStatement ParseReturn()
@@ -526,6 +542,12 @@ public class Parser
             expression = new IndexExpression(expression, index);
         }
 
+        while (Match(TokenType.Dot))
+        {
+            Token member = Consume(TokenType.Identifier, "expected member name after '.'");
+            expression = new MemberExpression(expression, member.Value);
+        }
+
         while (Match(TokenType.LeftParen))
         {
             var arguments = new List<Expression>();
@@ -617,12 +639,16 @@ public class ExpressionStatement : Statement
 public class FunctionStatement : Statement
 {
     public string Name { get; }
+    public bool IsExported { get; }
+    public string? ReturnType { get; }
     public List<FunctionParameter> Parameters { get; }
     public List<Statement> Body { get; }
 
-    public FunctionStatement(string name, List<FunctionParameter> parameters, List<Statement> body)
+    public FunctionStatement(string name, List<FunctionParameter> parameters, List<Statement> body, bool isExported = false, string? returnType = null)
     {
         Name = name;
+        IsExported = isExported;
+        ReturnType = returnType;
         Parameters = parameters;
         Body = body;
     }
@@ -632,4 +658,16 @@ public class ReturnStatement : Statement
 {
     public Expression? Value { get; }
     public ReturnStatement(Expression? value) => Value = value;
+}
+
+public class MemberExpression : Expression
+{
+    public Expression Object { get; }
+    public string Name { get; }
+
+    public MemberExpression(Expression @object, string name)
+    {
+        Object = @object;
+        Name = name;
+    }
 }

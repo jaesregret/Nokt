@@ -12,6 +12,7 @@ public enum ScopeKind
 public sealed class Environment
 {
     private readonly Dictionary<string, Variable> _variables = new();
+    private readonly HashSet<string> _exports = new();
 
     public Environment? Parent { get; }
     public ScopeKind Kind { get; }
@@ -47,6 +48,16 @@ public sealed class Environment
     }
 
     public IEnumerable<KeyValuePair<string, Variable>> LocalVariables => _variables;
+
+    public void Export(string name)
+    {
+        if (!_variables.ContainsKey(name))
+            throw new NoktException($"cannot export undefined symbol '{name}'");
+        _exports.Add(name);
+    }
+
+    public IEnumerable<KeyValuePair<string, Variable>> ExportedVariables =>
+        _variables.Where(pair => _exports.Contains(pair.Key));
 }
 
 public sealed class Variable
@@ -73,6 +84,18 @@ public sealed class FunctionValue
     }
 }
 
+public sealed class ModuleValue
+{
+    private readonly IReadOnlyDictionary<string, Variable> _members;
+
+    public ModuleValue(IEnumerable<KeyValuePair<string, Variable>> members)
+    {
+        _members = members.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+    }
+
+    public bool TryGet(string name, out Variable? variable) => _members.TryGetValue(name, out variable);
+}
+
 public sealed class VoidValue
 {
     public static VoidValue Instance { get; } = new();
@@ -87,5 +110,6 @@ public enum ValueType
     Bool,
     List,
     Function,
+    Module,
     Void
 }

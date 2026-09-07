@@ -7,10 +7,14 @@ var tests = new (string Name, Action Run)[]
     ("returns closures that keep captured environments", TestReturnedClosure),
     ("supports recursion", TestRecursion),
     ("preserves returned value types", TestReturnTypes),
+    ("validates explicit return types", TestExplicitReturnTypes),
+    ("rejects invalid return types", TestInvalidReturnTypes),
     ("supports parameter shadowing", TestParameterShadowing),
     ("keeps function locals private", TestFunctionScope),
     ("rejects invalid argument counts", TestArgumentCount),
     ("rejects invalid argument types", TestArgumentType)
+    ,("supports exported module namespaces", TestModuleNamespace)
+    ,("hides non-exported module members", TestPrivateModuleMember)
 };
 
 foreach ((string name, Action run) in tests)
@@ -55,6 +59,18 @@ static void TestReturnTypes()
     AssertEqual("43\nok!", output.Trim());
 }
 
+static void TestExplicitReturnTypes()
+{
+    string output = Run("fn add(a: int, b: int) -> int\n    return a + b\n\nsay add(10, 20)\n");
+    AssertEqual("30", output.Trim());
+}
+
+static void TestInvalidReturnTypes()
+{
+    AssertThrows("fn wrong() -> int\n    return \"nope\"\n\nsay wrong()\n", "function 'wrong' must return 'int', got 'string'");
+    AssertThrows("fn missing() -> int\n    say 1\n\nsay missing()\n", "function 'missing' must return 'int', got 'void'");
+}
+
 static void TestFunctionScope()
 {
     AssertThrows("fn make()\n    let hidden = 10\n\nmake()\nsay hidden\n", "undefined variable 'hidden'");
@@ -68,6 +84,28 @@ static void TestArgumentCount()
 static void TestArgumentType()
 {
     AssertThrows("fn add(a: int)\n    return a\n\nsay add(\"wrong\")\n", "variable 'a' is 'int' but received 'string'");
+}
+
+static void TestModuleNamespace()
+{
+    string output = RunWithModules(
+        "import \"math.nk\" as math\nsay math.add(1, 2)\n",
+        new Dictionary<string, string>
+        {
+            ["math.nk"] = "export fn add(a: int, b: int)\n    return a + b\n"
+        });
+    AssertEqual("3", output.Trim());
+}
+
+static void TestPrivateModuleMember()
+{
+    AssertThrowsWithModules(
+        "import \"math.nk\" as math\nsay math.hidden()\n",
+        new Dictionary<string, string>
+        {
+            ["math.nk"] = "fn hidden()\n    return 1\n"
+        },
+        "module has no exported member 'hidden'");
 }
 
 static string Run(string source)
@@ -84,6 +122,41 @@ static string Run(string source)
     finally
     {
         Console.SetOut(previous);
+    }
+}
+
+static string RunWithModules(string source, Dictionary<string, string> modules)
+{
+    var writer = new StringWriter();
+    TextWriter previous = Console.Out;
+    Console.SetOut(writer);
+    try
+    {
+        var statements = new Parser(new Lexer(source).Tokenize()).Parse();
+        var interpreter = new Interpreter((path, _) =>
+        {
+            if (!modules.TryGetValue(path, out string? moduleSource))
+                throw new NoktException($"module file '{path}' not found");
+            return new ModuleSource(path, new Parser(new Lexer(moduleSource).Tokenize()).Parse());
+        });
+        interpreter.Execute(statements);
+        return writer.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
+    }
+    finally
+    {
+        Console.SetOut(previous);
+    }
+}
+
+static void AssertThrowsWithModules(string source, Dictionary<string, string> modules, string expectedMessage)
+{
+    try
+    {
+        RunWithModules(source, modules);
+        throw new InvalidOperationException($"Expected error containing '{expectedMessage}'");
+    }
+    catch (NoktException exception) when (exception.Message.Contains(expectedMessage, StringComparison.Ordinal))
+    {
     }
 }
 

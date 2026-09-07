@@ -1,0 +1,2 @@
+import "math.nk" as math
+say math.add(1, 2)

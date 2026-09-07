@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
+using Nokt;
 
-namespace Nokt;
+namespace Nokt.Ui;
 
-public sealed class XUi
+public sealed class XUi : IUiHost
 {
     public void Show(UiWindowDefinition definition, Action<List<Statement>> execute)
     {
