@@ -1,0 +1,65 @@
+fn attack(power: int, armor: int) -> int
+    let damage = power - armor
+
+    if damage < 1
+        return 1
+
+    return damage
+
+fn fight()
+    let playerHp = 30
+    let enemyHp = 25
+    let potions = 2
+
+    while playerHp > 0 and enemyHp > 0
+        say ""
+        say "=== Battle ==="
+        say "Your HP: " + playerHp
+        say "Enemy HP: " + enemyHp
+        say "Potions: " + potions
+        say ""
+        say "1 - Attack"
+        say "2 - Heavy Attack"
+        say "3 - Heal"
+        say "4 - Run"
+
+        let choice = readInt()
+
+        if choice == 1
+            let damage = attack(10, 3)
+            enemyHp = enemyHp - damage
+            say "You deal damage!"
+
+        else
+            if choice == 2
+                let damage = attack(16, 3)
+                enemyHp = enemyHp - damage
+                say "You use Heavy Attack!"
+
+            else
+                if choice == 3
+                    if potions > 0
+                        playerHp = playerHp + 10
+                        potions = potions - 1
+                        say "You heal!"
+                    else
+                        say "You have no potions!"
+
+                else
+                    if choice == 4
+                        say "You escaped!"
+                        break
+                    else
+                        say "Invalid choice!"
+
+        if enemyHp > 0
+            playerHp = playerHp - 4
+            say "The enemy attacks!"
+
+    if playerHp <= 0
+        say "You lost!"
+    else
+        if enemyHp <= 0
+            say "You won!"
+
+fight()

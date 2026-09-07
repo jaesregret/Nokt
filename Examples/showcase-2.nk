@@ -1,0 +1,12 @@
+# Showcase 2: colecoes e loops
+# range cria uma lista de inteiros.
+
+let total = 0
+for value in range(1, 6)
+    if value == 3
+        continue
+    total = total + value
+
+say "total: " + "calculated"
+say total
+say len(range(4))

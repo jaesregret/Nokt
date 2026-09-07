@@ -1,0 +1,14 @@
+# Showcase 1: fundamentos
+# Variaveis, tipos, funcoes e condicoes simples.
+
+fn greet(name: string) -> string
+    return "Hello, " + name
+
+let player = "Jae"
+say greet(player)
+
+let score: int = 12
+if score > 10
+    say "good score"
+else
+    say "keep trying"
