@@ -66,6 +66,17 @@ public sealed class TypeChecker
                 EnsureBoolean(loop.Condition, scope, "while condition");
                 CheckBlock(loop.Body, scope, returnType);
                 break;
+            case ForStatement loop:
+                ValueType? iterableType = CheckExpression(loop.Iterable, scope);
+                if (iterableType is not null && iterableType != ValueType.List)
+                    throw Error("for loop requires a list");
+                var forScope = new TypeScope(scope);
+                forScope.Define(loop.VariableName, null);
+                CheckBlock(loop.Body, forScope, returnType);
+                break;
+            case BreakStatement:
+            case ContinueStatement:
+                break;
         }
     }
 
@@ -138,6 +149,7 @@ public sealed class TypeChecker
         if (binary.Operator is "+")
         {
             if (left == right && (left == ValueType.Int || left == ValueType.String)) return left;
+            if ((left == ValueType.String && right == ValueType.Int) || (left == ValueType.Int && right == ValueType.String)) return ValueType.String;
             throw Error("operator '+' requires two integers or two strings");
         }
         if (binary.Operator is "-" or "*" or "/" or ">" or "<" or ">=" or "<=")

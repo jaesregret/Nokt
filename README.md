@@ -7,6 +7,8 @@
 - Use strings, integers, booleans, lists, and variables.
 - Do math, string concatenation, comparisons, and logic with `and`, `or`, and `not`.
 - Control the flow with `if`, `else`, and `while`.
+- Iterate with `for ... in`, and control loops with `break` and `continue`.
+- Use the tiny standard library: `len(value)` and `range(start, end)`.
 - Add comments with `#`.
 - Define functions with `fn`, parameters, calls, and `return`.
 - Use closures and nested scopes, including variable shadowing.
@@ -36,4 +38,12 @@ To run the tests:
 
 ```text
 dotnet run --project Tests/Nokt.Tests.csproj
+```
+
+Three guided showcases are available:
+
+```text
+dotnet run --project src/nk/Nokt.csproj -- Examples/showcase-1.nk
+dotnet run --project src/nk/Nokt.csproj -- Examples/showcase-2.nk
+dotnet run --project src/nk/Nokt.csproj -- Examples/showcase-3-rpg.nk
 ```

@@ -84,6 +84,18 @@ public sealed class FunctionValue
     }
 }
 
+public sealed class BuiltinFunctionValue
+{
+    public string Name { get; }
+    public Func<List<object>, object> Invoke { get; }
+
+    public BuiltinFunctionValue(string name, Func<List<object>, object> invoke)
+    {
+        Name = name;
+        Invoke = invoke;
+    }
+}
+
 public sealed class ModuleValue
 {
     private readonly IReadOnlyDictionary<string, Variable> _members;

@@ -148,6 +148,23 @@ public class WhileStatement : Statement
     }
 }
 
+public class ForStatement : Statement
+{
+    public string VariableName { get; }
+    public Expression Iterable { get; }
+    public List<Statement> Body { get; }
+
+    public ForStatement(string variableName, Expression iterable, List<Statement> body)
+    {
+        VariableName = variableName;
+        Iterable = iterable;
+        Body = body;
+    }
+}
+
+public class BreakStatement : Statement { }
+public class ContinueStatement : Statement { }
+
 public class WindowStatement : Statement
 {
     public UiWindowDefinition Window { get; }
@@ -239,6 +256,17 @@ public class Parser
         if (Check(TokenType.Identifier) && CheckNext(TokenType.Equals)) return ParseAssignment();
         if (Match(TokenType.If)) return ParseIf();
         if (Match(TokenType.While)) return ParseWhile();
+        if (Match(TokenType.For)) return ParseFor();
+        if (Match(TokenType.Break))
+        {
+            RequireLineEnd("after 'break'");
+            return new BreakStatement();
+        }
+        if (Match(TokenType.Continue))
+        {
+            RequireLineEnd("after 'continue'");
+            return new ContinueStatement();
+        }
         if (Match(TokenType.Window)) return ParseWindow();
 
         Expression expression = ParseExpression();
@@ -333,6 +361,15 @@ public class Parser
         Expression condition = ParseExpression();
         RequireNewLine("after while condition");
         return new WhileStatement(condition, ParseIndentedBlock("while"));
+    }
+
+    private ForStatement ParseFor()
+    {
+        Token variable = Consume(TokenType.Identifier, "expected loop variable after 'for'");
+        Consume(TokenType.In, "expected 'in' after loop variable");
+        Expression iterable = ParseExpression();
+        RequireNewLine("after for loop");
+        return new ForStatement(variable.Value, iterable, ParseIndentedBlock("for"));
     }
 
     private WindowStatement ParseWindow()

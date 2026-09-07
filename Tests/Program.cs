@@ -19,6 +19,10 @@ var tests = new (string Name, Action Run)[]
     ,("rejects heterogeneous lists", TestHeterogeneousLists)
     ,("catches obvious type errors statically", TestStaticTypeErrors)
     ,("supports typed homogeneous lists", TestTypedLists)
+    ,("supports for loops with break and continue", TestForLoops)
+    ,("supports len and range", TestStdlib)
+    ,("keeps break scoped to its function", TestFunctionLoopScope)
+    ,("supports input and display concatenation", TestInputAndDisplay)
 };
 
 foreach ((string name, Action run) in tests)
@@ -142,6 +146,29 @@ static void TestTypedLists()
     AssertStaticThrows("let values: list[int] = [1, \"two\"]\n", "list elements must have the same type");
 }
 
+static void TestForLoops()
+{
+    string output = Run("let total = 0\nfor value in range(6)\n    if value == 2\n        continue\n    if value == 5\n        break\n    total = total + value\nsay total\n");
+    AssertEqual("8", output.Trim());
+}
+
+static void TestStdlib()
+{
+    string output = Run("let values = range(3)\nsay len(values)\nsay len(\"nokt\")\n");
+    AssertEqual("3\n4", output.Trim());
+}
+
+static void TestFunctionLoopScope()
+{
+    AssertThrows("fn stop()\n    break\n\nfor value in range(1)\n    stop()\n", "break can only be used inside a loop");
+}
+
+static void TestInputAndDisplay()
+{
+    string output = RunWithInput("say \"HP: \" + 10\n", "");
+    AssertEqual("HP: 10", output.Trim());
+}
+
 static string Run(string source)
 {
     var writer = new StringWriter();
@@ -156,6 +183,20 @@ static string Run(string source)
     finally
     {
         Console.SetOut(previous);
+    }
+}
+
+static string RunWithInput(string source, string input)
+{
+    TextReader previousInput = Console.In;
+    Console.SetIn(new StringReader(input));
+    try
+    {
+        return Run(source);
+    }
+    finally
+    {
+        Console.SetIn(previousInput);
     }
 }
 

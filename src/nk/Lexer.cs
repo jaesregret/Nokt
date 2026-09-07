@@ -17,6 +17,10 @@ public class Lexer
         ["if"] = TokenType.If,
         ["else"] = TokenType.Else,
         ["while"] = TokenType.While,
+        ["for"] = TokenType.For,
+        ["in"] = TokenType.In,
+        ["break"] = TokenType.Break,
+        ["continue"] = TokenType.Continue,
         ["true"] = TokenType.True,
         ["false"] = TokenType.False,
         ["and"] = TokenType.And,
@@ -200,7 +204,7 @@ public class Lexer
             Advance();
         }
 
-        if (IsAtEnd() || Peek() == '\n' || Peek() == '#')
+        if (IsAtEnd() || Peek() == '\n' || Peek() == '\r' || Peek() == '#')
             return;
 
         _atLineStart = false;

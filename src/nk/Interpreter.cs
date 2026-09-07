@@ -12,12 +12,16 @@ public class Interpreter
     private Environment _currentEnvironment;
     private string _currentModulePath = string.Empty;
     private int _functionDepth;
+    private int _loopDepth;
 
     public Interpreter(Func<string, string, ModuleSource>? moduleLoader = null, IUiHost? uiHost = null)
     {
         _moduleLoader = moduleLoader;
         _uiHost = uiHost;
         _currentEnvironment = _globalEnvironment;
+        _globalEnvironment.Define("len", new Variable(ValueType.Function, new BuiltinFunctionValue("len", BuiltinLen)));
+        _globalEnvironment.Define("range", new Variable(ValueType.Function, new BuiltinFunctionValue("range", BuiltinRange)));
+        _globalEnvironment.Define("readInt", new Variable(ValueType.Function, new BuiltinFunctionValue("readInt", BuiltinReadInt)));
     }
 
     public void Execute(List<Statement> statements, string modulePath = "")
@@ -94,9 +98,27 @@ public class Interpreter
                 break;
             case WhileStatement loop:
                 Environment loopEnvironment = _currentEnvironment.CreateChild(ScopeKind.Local);
-                while (RequireBoolean(Evaluate(loop.Condition), "while condition"))
-                    ExecuteInEnvironment(loop.Body, loopEnvironment);
+                _loopDepth++;
+                try
+                {
+                    while (RequireBoolean(Evaluate(loop.Condition), "while condition"))
+                    {
+                        try { ExecuteInEnvironment(loop.Body, loopEnvironment); }
+                        catch (ContinueSignal) { }
+                        catch (BreakSignal) { break; }
+                    }
+                }
+                finally { _loopDepth--; }
                 break;
+            case ForStatement loop:
+                ExecuteFor(loop);
+                break;
+            case BreakStatement:
+                if (_loopDepth == 0) throw new NoktException("break can only be used inside a loop");
+                throw new BreakSignal();
+            case ContinueStatement:
+                if (_loopDepth == 0) throw new NoktException("continue can only be used inside a loop");
+                throw new ContinueSignal();
             case WindowStatement window:
                 if (_uiHost is null)
                     throw new NoktException("GUI support is unavailable in the core runtime; use Nokt.Ui");
@@ -131,6 +153,27 @@ public class Interpreter
     private void ExecuteLocalBlock(List<Statement> statements)
     {
         ExecuteInEnvironment(statements, _currentEnvironment.CreateChild(ScopeKind.Local));
+    }
+
+    private void ExecuteFor(ForStatement loop)
+    {
+        object iterable = Evaluate(loop.Iterable);
+        if (iterable is not ListValue values)
+            throw new NoktException("for loop requires a list");
+
+        Environment loopEnvironment = _currentEnvironment.CreateChild(ScopeKind.Local);
+        _loopDepth++;
+        try
+        {
+            foreach (object value in values)
+            {
+                loopEnvironment.Define(loop.VariableName, new Variable(GetValueType(value), value));
+                try { ExecuteInEnvironment(loop.Body, loopEnvironment); }
+                catch (ContinueSignal) { }
+                catch (BreakSignal) { break; }
+            }
+        }
+        finally { _loopDepth--; }
     }
 
     private object Evaluate(Expression expression)
@@ -210,6 +253,8 @@ public class Interpreter
     private object EvaluateCall(CallExpression expression)
     {
         object callee = Evaluate(expression.Callee);
+        if (callee is BuiltinFunctionValue builtin)
+            return builtin.Invoke(expression.Arguments.Select(Evaluate).ToList());
         if (callee is not FunctionValue function)
             throw new NoktException("only functions can be called");
 
@@ -234,6 +279,8 @@ public class Interpreter
             callEnvironment.Define(parameter.Name, new Variable(type, argument));
         }
 
+        int previousLoopDepth = _loopDepth;
+        _loopDepth = 0;
         _functionDepth++;
         try
         {
@@ -248,6 +295,7 @@ public class Interpreter
         finally
         {
             _functionDepth--;
+            _loopDepth = previousLoopDepth;
         }
 
         object implicitReturn = VoidValue.Instance;
@@ -312,6 +360,8 @@ public class Interpreter
     {
         if (left is int leftNumber && right is int rightNumber) return leftNumber + rightNumber;
         if (left is string leftString && right is string rightString) return leftString + rightString;
+        if (left is string text && right is int number) return text + number;
+        if (left is int value && right is string suffix) return value + suffix;
         throw OperatorError("operator '+' requires two integers or two strings", token);
     }
 
@@ -322,6 +372,7 @@ public class Interpreter
         bool => ValueType.Bool,
         ListValue => ValueType.List,
         FunctionValue => ValueType.Function,
+        BuiltinFunctionValue => ValueType.Function,
         ModuleValue => ValueType.Module,
         VoidValue => ValueType.Void,
         _ => throw new NoktException($"unsupported value type '{value.GetType().Name}'")
@@ -408,6 +459,36 @@ public class Interpreter
         public object? Value { get; }
         public ReturnSignal(object? value) => Value = value;
     }
+
+    private static object BuiltinLen(List<object> arguments)
+    {
+        if (arguments.Count != 1) throw new NoktException($"function 'len' expected 1 argument(s), got {arguments.Count}");
+        if (arguments[0] is ListValue list) return list.Count;
+        if (arguments[0] is string text) return text.Length;
+        throw new NoktException("function 'len' expects a list or string");
+    }
+
+    private static object BuiltinRange(List<object> arguments)
+    {
+        if (arguments.Count is < 1 or > 2) throw new NoktException($"function 'range' expected 1 or 2 argument(s), got {arguments.Count}");
+        if (arguments.Any(argument => argument is not int)) throw new NoktException("function 'range' expects integer arguments");
+        int start = arguments.Count == 1 ? 0 : (int)arguments[0];
+        int end = arguments.Count == 1 ? (int)arguments[0] : (int)arguments[1];
+        return new ListValue(Enumerable.Range(start, Math.Max(0, end - start)).Cast<object>(), ValueType.Int);
+    }
+
+    private static object BuiltinReadInt(List<object> arguments)
+    {
+        if (arguments.Count != 0)
+            throw new NoktException($"function 'readInt' expected 0 argument(s), got {arguments.Count}");
+
+        string? input = Console.ReadLine();
+        if (int.TryParse(input, out int value)) return value;
+        throw new NoktException($"readInt expected an integer, got '{input ?? "end of input"}'");
+    }
+
+    private sealed class BreakSignal : Exception { }
+    private sealed class ContinueSignal : Exception { }
 }
 
 public sealed record ModuleSource(string Path, List<Statement> Statements);
