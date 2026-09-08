@@ -16,6 +16,8 @@ public enum TokenType
     In,
     Break,
     Continue,
+    Try,
+    Catch,
     True,
     False,
     And,

@@ -1,5 +1,4 @@
-# Showcase 1: fundamentos
-# Variaveis, tipos, funcoes e condicoes simples.
+# fundamentals
 
 fn greet(name: string) -> string
     return "Hello, " + name

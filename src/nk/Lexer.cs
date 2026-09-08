@@ -21,6 +21,8 @@ public class Lexer
         ["in"] = TokenType.In,
         ["break"] = TokenType.Break,
         ["continue"] = TokenType.Continue,
+        ["try"] = TokenType.Try,
+        ["catch"] = TokenType.Catch,
         ["true"] = TokenType.True,
         ["false"] = TokenType.False,
         ["and"] = TokenType.And,

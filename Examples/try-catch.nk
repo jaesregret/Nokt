@@ -1,0 +1,7 @@
+try
+    let values = [1]
+    say values[4]
+catch error
+    say "caught: ${error}"
+
+say "continued"

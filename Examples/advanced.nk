@@ -1,0 +1,22 @@
+let name = "Nokt"
+let count = 3
+say "Hello ${name}, count=${count + 1}"
+say "  hello  ".trim().upper()
+
+let values = [1, 2]
+values.push(3)
+say values.join(",")
+say values.contains(2)
+say values.pop()
+say len(values)
+
+writeFile("Examples\\advanced-output.txt", "created")
+say fileExists("Examples\\advanced-output.txt")
+say readFile("Examples\\advanced-output.txt")
+appendFile("Examples\\advanced-output.txt", "!")
+say readFile("Examples\\advanced-output.txt")
+
+try
+    say values[99]
+catch error
+    say "handled: ${error}"

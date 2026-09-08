@@ -1,0 +1,6 @@
+:help
+let answer = 40
+say "answer=${answer + 2}"
+:load Examples/vars.nk
+:clear
+:quit

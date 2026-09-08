@@ -77,6 +77,13 @@ public sealed class TypeChecker
             case BreakStatement:
             case ContinueStatement:
                 break;
+            case TryCatchStatement tryCatch:
+                CheckBlock(tryCatch.TryBranch, scope, returnType);
+                var catchScope = new TypeScope(scope);
+                if (tryCatch.ErrorName is not null)
+                    catchScope.Define(tryCatch.ErrorName, ValueType.String);
+                CheckBlock(tryCatch.CatchBranch, catchScope, returnType);
+                break;
         }
     }
 

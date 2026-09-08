@@ -15,6 +15,13 @@
 - Split code into modules with `export` and `import ... as ...`.
 - Build simple Windows Forms interfaces through the optional UI project.
 - Get useful lexer, parser, and runtime error messages with line and column information.
+- Handle recoverable runtime failures with `try` and `catch error`.
+- Interpolate expressions inside strings with `${expression}`.
+- Use standard-library file functions: `readFile`, `writeFile`, `appendFile`, and `fileExists`.
+- Use list functions and methods: `push`, `pop`, `contains`, and `join`.
+- Use string methods: `upper`, `lower`, `trim`, `contains`, `startsWith`, `endsWith`, `substring`, `replace`, and `split`.
+- Use the interactive REPL with `--repl`, including `:load`, `:clear`, and `:quit`.
+- Reuse compiled, type-checked ASTs through a file compilation cache. This is the preparation point for future bytecode caching and JIT compilation; no VM or JIT exists yet.
 
 The language core targets `net8.0` and does not depend on Windows. GUI support is optional and lives in `src/nk.Ui`, targeting `net8.0-windows`.
 
@@ -25,6 +32,23 @@ To try the main example, run:
 dotnet run --project src/nk/Nokt.csproj -- Examples/features.nk
 
 ```
+
+Start the REPL with:
+
+```text
+dotnet run --project src/nk/Nokt.csproj -- --repl
+```
+
+Example error handling:
+
+```nokt
+try
+	say readFile("missing.txt")
+catch error
+	say "Could not read file: ${error}"
+```
+
+The complete examples are in `Examples/advanced.nk` and `Examples/try-catch.nk`.
 The GUI example runs on Windows through the optional UI project:
 
 ```text

@@ -165,6 +165,20 @@ public class ForStatement : Statement
 public class BreakStatement : Statement { }
 public class ContinueStatement : Statement { }
 
+public class TryCatchStatement : Statement
+{
+    public List<Statement> TryBranch { get; }
+    public string? ErrorName { get; }
+    public List<Statement> CatchBranch { get; }
+
+    public TryCatchStatement(List<Statement> tryBranch, string? errorName, List<Statement> catchBranch)
+    {
+        TryBranch = tryBranch;
+        ErrorName = errorName;
+        CatchBranch = catchBranch;
+    }
+}
+
 public class WindowStatement : Statement
 {
     public UiWindowDefinition Window { get; }
@@ -225,6 +239,15 @@ public class Parser
         return statements;
     }
 
+    public Expression ParseExpressionForInterpolation()
+    {
+        SkipNewLines();
+        Expression expression = ParseExpression();
+        if (!IsAtEnd())
+            throw Error($"unexpected token in interpolation '{Display(Peek())}'", Peek());
+        return expression;
+    }
+
     private Statement ParseStatement()
     {
         if (Match(TokenType.Export))
@@ -267,6 +290,7 @@ public class Parser
             RequireLineEnd("after 'continue'");
             return new ContinueStatement();
         }
+        if (Match(TokenType.Try)) return ParseTryCatch();
         if (Match(TokenType.Window)) return ParseWindow();
 
         Expression expression = ParseExpression();
@@ -370,6 +394,18 @@ public class Parser
         Expression iterable = ParseExpression();
         RequireNewLine("after for loop");
         return new ForStatement(variable.Value, iterable, ParseIndentedBlock("for"));
+    }
+
+    private TryCatchStatement ParseTryCatch()
+    {
+        RequireNewLine("after 'try'");
+        List<Statement> tryBranch = ParseIndentedBlock("try");
+        Consume(TokenType.Catch, "expected 'catch' after try block");
+        string? errorName = null;
+        if (Check(TokenType.Identifier)) errorName = Advance().Value;
+        RequireNewLine("after 'catch'");
+        List<Statement> catchBranch = ParseIndentedBlock("catch");
+        return new TryCatchStatement(tryBranch, errorName, catchBranch);
     }
 
     private WindowStatement ParseWindow()
@@ -579,31 +615,36 @@ public class Parser
             throw Error($"expected expression, found '{Display(unexpected)}'", unexpected);
         }
 
-        while (Match(TokenType.LeftBracket))
+        while (true)
         {
-            Expression index = ParseExpression();
-            Consume(TokenType.RightBracket, "expected ']' after index");
-            expression = new IndexExpression(expression, index);
-        }
-
-        while (Match(TokenType.Dot))
-        {
-            Token member = Consume(TokenType.Identifier, "expected member name after '.'");
-            expression = new MemberExpression(expression, member.Value);
-        }
-
-        while (Match(TokenType.LeftParen))
-        {
-            var arguments = new List<Expression>();
-            if (!Check(TokenType.RightParen))
+            if (Match(TokenType.LeftBracket))
             {
-                do
-                {
-                    arguments.Add(ParseExpression());
-                } while (Match(TokenType.Comma));
+                Expression index = ParseExpression();
+                Consume(TokenType.RightBracket, "expected ']' after index");
+                expression = new IndexExpression(expression, index);
             }
-            Consume(TokenType.RightParen, "expected ')' after function arguments");
-            expression = new CallExpression(expression, arguments);
+            else if (Match(TokenType.Dot))
+            {
+                Token member = Consume(TokenType.Identifier, "expected member name after '.'");
+                expression = new MemberExpression(expression, member.Value);
+            }
+            else if (Match(TokenType.LeftParen))
+            {
+                var arguments = new List<Expression>();
+                if (!Check(TokenType.RightParen))
+                {
+                    do
+                    {
+                        arguments.Add(ParseExpression());
+                    } while (Match(TokenType.Comma));
+                }
+                Consume(TokenType.RightParen, "expected ')' after function arguments");
+                expression = new CallExpression(expression, arguments);
+            }
+            else
+            {
+                break;
+            }
         }
 
         return expression;
