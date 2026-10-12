@@ -1,0 +1,4 @@
+say "First line\nSecond line"
+say "Column one\tColumn two"
+say "Quoted: \"Nokt\""
+say "Path: C:\\Nokt\\Examples"

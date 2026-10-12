@@ -241,7 +241,34 @@ public class Lexer
             if (Peek() == '\n')
                 throw Error("unterminated string", line, column, "\"");
 
-            sb.Append(Advance());
+            char value = Advance();
+            if (value != '\\')
+            {
+                sb.Append(value);
+                continue;
+            }
+
+            if (IsAtEnd())
+            {
+                sb.Append(value);
+                break;
+            }
+
+            char escaped = Advance();
+            if (escaped == '\n')
+                throw Error("unterminated string", line, column, "\"");
+
+            switch (escaped)
+            {
+                case 'n': sb.Append('\n'); break;
+                case 't': sb.Append('\t'); break;
+                case '"': sb.Append('"'); break;
+                case '\\': sb.Append('\\'); break;
+                default:
+                    sb.Append(value);
+                    sb.Append(escaped);
+                    break;
+            }
         }
 
         if (IsAtEnd())
