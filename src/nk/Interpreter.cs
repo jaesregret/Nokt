@@ -68,7 +68,7 @@ public class Interpreter
                 ExecuteImport(import);
                 break;
             case SayStatement say:
-                Console.WriteLine(Evaluate(say.Value));
+                Console.WriteLine(ValueToString(Evaluate(say.Value)));
                 break;
             case ExpressionStatement expression:
                 Evaluate(expression.Expression);
@@ -298,7 +298,7 @@ public class Interpreter
             if (source.Length == 0)
                 throw new NoktException("empty string interpolation expression");
             Expression expression = new Parser(new Lexer(source).Tokenize()).ParseExpressionForInterpolation();
-            result.Append(Evaluate(expression));
+            result.Append(ValueToString(Evaluate(expression)));
             position = end + 1;
         }
         return result.ToString();

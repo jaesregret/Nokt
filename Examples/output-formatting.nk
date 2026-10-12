@@ -1,0 +1,4 @@
+say true
+say false
+say [1, 2, 3]
+say "Values: ${true}, ${false}, ${[1, 2, 3]}"
